@@ -39,7 +39,7 @@ bash dist/gitstart.sh
 
 | ID | Check | Requirement IDs | Pass condition |
 |----|-------|-----------------|----------------|
-| MT-010 | Arrow navigation | FR-064, FR-065 | Up and Down move the highlight |
+| MT-010 | Arrow navigation | FR-064, FR-065 | Up and Down move the highlight on macOS Bash 3.2 and Git Bash |
 | MT-011 | Enter opens directory | FR-065 | Enter on a `name/` row opens that folder |
 | MT-012 | Select current | FR-062, FR-066 | Highlight `.  (use this folder)` and press Enter |
 | MT-013 | Parent navigation | FR-063 | Highlight `..` or press Left to move up |

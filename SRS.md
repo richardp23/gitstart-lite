@@ -1,7 +1,7 @@
 # GitStart Software Requirements Specification
 
 Document ID: GS-SRS-001  
-Version: 0.3.0
+Version: 0.3.1
 Status: Draft for implementation  
 Date: 2026-07-28  
 Primary audience: Project owner, developers, testers, and instructors

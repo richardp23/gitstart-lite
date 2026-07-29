@@ -54,6 +54,8 @@ input_read_line() {
 
 # Read one key when raw mode is available. Sets GS_INPUT_LAST to a token:
 # up, down, left, right, enter, backspace, esc, or a single character.
+# Bash 3.2 (macOS /bin/bash) rejects fractional read -t values such as 0.1.
+# Escape-sequence tails use stty VTIME (tenths of a second) instead.
 input_read_key() {
     local key
     local rest
@@ -67,9 +69,11 @@ input_read_key() {
         return 1
     }
     if [ "${key}" = $'\033' ]; then
-        IFS= read -r -n 1 -t 0.1 rest </dev/tty || rest=""
+        # Wait up to 0.1s for CSI bytes. Do not use fractional read timeouts.
+        stty -echo -icanon time 1 min 0 2>/dev/null || true
+        IFS= read -r -n 1 rest </dev/tty || rest=""
         if [ "${rest}" = "[" ]; then
-            IFS= read -r -n 1 -t 0.1 rest </dev/tty || rest=""
+            IFS= read -r -n 1 rest </dev/tty || rest=""
             case "${rest}" in
                 A) GS_INPUT_LAST="up" ;;
                 B) GS_INPUT_LAST="down" ;;

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Version: 0.3.0
+Version: 0.3.1
 Date: 2026-07-28
 
 This file is the agent tracking and architecture guide for GitStart Lite.
@@ -402,8 +402,6 @@ The app runs locally (no telemetry, no phone-home after bootstrap).
 Students normally use network for launch and for Git remotes.
 Keep clear network-failure messages when a remote step needs a connection.
 Instructor download docs may describe a standalone file without leading with “offline.”
-
----
 
 ### D-016 Application versioning (Lite stays on 0.x)
 

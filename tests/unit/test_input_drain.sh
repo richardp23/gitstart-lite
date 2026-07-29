@@ -55,4 +55,10 @@ assert_fail "input_drain_tty must not use blocking read -d ''" \
 assert_contains "$(sed -n '/^input_restore_tty()/,/^}/p' "${ROOT}/src/40_input.sh")" "echo icanon" \
     "input_restore_tty forces echo icanon"
 
+# Bash 3.2 (macOS) rejects fractional read -t; arrow parsing must not use it.
+assert_fail "input_read_key must not use fractional read -t (Bash 3.2)" \
+    grep -E 'IFS= read .* -t 0\.[0-9]' "${ROOT}/src/40_input.sh"
+assert_contains "$(sed -n '/^input_read_key()/,/^}/p' "${ROOT}/src/40_input.sh")" "time 1 min 0" \
+    "input_read_key uses stty VTIME for escape tails"
+
 test_summary
