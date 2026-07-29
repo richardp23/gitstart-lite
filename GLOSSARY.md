@@ -1,6 +1,6 @@
 # GitStart Lite Glossary
 
-Version: 0.2.1
+Version: 0.3.0
 Date: 2026-07-29
 
 This glossary defines approved terms for GitStart Lite. Text uses ASD-STE100 principles. This document is not a formal STE certification.
@@ -55,6 +55,9 @@ A built-in filter for directory names. It matches exact names, prefixes, substri
 
 **Git**  
 A version control system. GitStart teaches safe local Git workflows.
+
+**`.gitignore`**  
+A project file that lists names Git should skip. Git does not stage those names when you run `git add .`. Use it for secrets and generated folders.
 
 ## L
 

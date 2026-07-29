@@ -97,6 +97,20 @@ ${name}"
     done
 }
 
+# Explain .gitignore in plain language before any decision (NFR-004, FR-143).
+safety_explain_gitignore() {
+    ui_info "What is a .gitignore file?"
+    ui_print "A .gitignore file tells Git which files to leave alone."
+    ui_print "Git will not stage those files when you run git add ."
+    ui_blank
+    ui_muted "Use it for secrets, such as .env or password files."
+    ui_muted "Use it for generated folders, such as node_modules or build."
+    ui_muted "Your project source files still get tracked as normal."
+    ui_blank
+    ui_print "Without .gitignore, a secret or large generated folder can enter a commit."
+    ui_print "Then it can be pushed to the remote. That is hard to undo safely."
+}
+
 # Show secret and generated warnings for a directory. Return 1 when hits exist.
 safety_review_directory() {
     local dir="$1"
@@ -110,33 +124,50 @@ safety_review_directory() {
         has_issue=1
         names="$(printf '%s\n' "${GS_SAFE_SECRET_HITS}" | tr '\n' ',' | sed 's/,$//;s/,/, /g')"
         ui_warning "Secret-looking names: ${names}"
-        ui_muted "File contents were not read. Prefer .gitignore before git add."
+        ui_muted "File contents were not read."
+        ui_muted "A .gitignore file can keep these names out of git add ."
+        ui_muted "Code: ${GS_CODE_SAFE_SECRET}"
     fi
 
     if [ -n "${GS_SAFE_GENERATED_HITS}" ]; then
         has_issue=1
         names="$(printf '%s\n' "${GS_SAFE_GENERATED_HITS}" | tr '\n' ',' | sed 's/,$//;s/,/, /g')"
         ui_warning "Generated folders: ${names}"
-        ui_muted "Prefer .gitignore before git add."
+        ui_muted "These folders are usually built by tools. Do not commit them."
+        ui_muted "A .gitignore file can keep them out of git add ."
     fi
 
     return "${has_issue}"
 }
 
-# Ensure a .gitignore exists or is reviewed when warnings exist.
+# Teach .gitignore, then create or confirm before staging (FR-143, NFR-004).
 safety_ensure_gitignore_review() {
     local dir="$1"
+
+    safety_explain_gitignore
+    ui_blank
+
     if [ ! -f "${dir}/.gitignore" ]; then
-        ui_warning "No .gitignore yet."
-        if input_confirm "Create a basic .gitignore?"; then
+        ui_warning "This folder has no .gitignore file yet."
+        ui_print "GitStart can create a basic starter file for secrets and generated folders."
+        ui_muted "You can edit the file later for your project."
+        if input_confirm "Create a basic .gitignore now?"; then
             safety_write_basic_gitignore "${dir}"
-            ui_success "Created .gitignore."
+            ui_success "Created .gitignore in this folder."
+            ui_muted "It lists common secret names and generated folders."
+            ui_muted "Open the file in your editor if you want to add more names."
         else
-            ui_next "Add .gitignore before you stage private or generated files."
+            ui_warning "Continuing without .gitignore."
+            ui_next "Create one before git add . if this folder has secrets or generated files."
+            if ! input_confirm "Continue without .gitignore?"; then
+                return 1
+            fi
         fi
     else
-        ui_muted ".gitignore found."
-        if ! input_confirm "Continue?"; then
+        ui_success "A .gitignore file is already in this folder."
+        ui_muted "Git will skip names listed in that file when you stage files."
+        if ! input_confirm "Continue with this .gitignore?"; then
+            ui_next "Edit .gitignore in your editor. Then run this lesson again."
             return 1
         fi
     fi

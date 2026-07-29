@@ -492,7 +492,8 @@ picker_confirm_and_teach_cd() {
         fi
     fi
     if [ -n "${warn_bits}" ]; then
-        ui_warning "Note: ${warn_bits} found. You will review .gitignore next."
+        ui_warning "Note: ${warn_bits} found."
+        ui_muted "Next you will learn about .gitignore, a file that tells Git what to skip."
     fi
     safety_is_dangerous_directory "${dir}" || true
     if [ "${GS_SAFE_DANGEROUS}" = "1" ]; then

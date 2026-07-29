@@ -1,6 +1,6 @@
 # GitStart Lite Implementation Plan
 
-Version: 0.2.1
+Version: 0.3.0
 Date: 2026-07-28  
 Status: Active
 

@@ -47,15 +47,16 @@ lesson_sync_fork() {
     fi
 
     lesson_step_begin "Explain origin and upstream"
-    ui_info "origin is your fork on the hosting service"
-    ui_info "upstream is the original repository that you forked"
-    ui_info "You fetch from upstream. You push to origin"
+    ui_info "A fork is your copy of someone else's project on a hosting service."
+    ui_info "origin is your fork. You push to origin."
+    ui_info "upstream is the original project. You fetch from upstream."
+    ui_muted "This lesson updates your local branch from upstream, then pushes to your fork."
 
     if ! lesson_teach_exact_command \
         "git remote -v" \
         lesson_fork_run_remote_v \
-        "List remotes to see which URLs are configured." \
-        "You see remote names and sanitized URLs"
+        "List remotes so you can see which URLs are configured." \
+        "You see remote names and sanitized URLs."
     then
         return 1
     fi
@@ -72,6 +73,8 @@ lesson_sync_fork() {
 
     if [ "${GS_STATE_HAS_UPSTREAM_REMOTE}" != "1" ]; then
         lesson_step_begin "Add the upstream remote"
+        ui_info "You need the HTTPS URL of the original repository you forked."
+        ui_muted "Example: https://github.com/ORIGINAL_OWNER/PROJECT.git"
         while true; do
             input_text "Enter the original repository HTTPS URL: " || return 1
             GS_LESSON_FORK_UPSTREAM_URL="$(input_trim "${GS_INPUT_LAST}")"
@@ -83,8 +86,8 @@ lesson_sync_fork() {
         if ! lesson_teach_exact_command \
             "git remote add upstream $(printf '%q' "${GS_LESSON_FORK_UPSTREAM_URL}")" \
             lesson_fork_run_add_upstream \
-            "upstream points to the original project repository." \
-            "Git stores the upstream remote URL"
+            "Save the original project URL under the name upstream." \
+            "Git stores the upstream remote URL."
         then
             return 1
         fi
@@ -102,11 +105,12 @@ lesson_sync_fork() {
     fi
 
     lesson_step_begin "Fetch from upstream"
+    ui_info "Fetch downloads commits from the original project without changing your files."
     if ! lesson_teach_exact_command \
         "git fetch upstream" \
         lesson_fork_run_fetch_upstream \
-        "Fetch downloads commits from the original repository." \
-        "upstream remote-tracking branches are updated"
+        "Download new commits from the original repository." \
+        "upstream remote-tracking branches are updated."
     then
         lesson_explain_offline "git fetch upstream"
         return 1
@@ -114,6 +118,7 @@ lesson_sync_fork() {
 
     lesson_step_begin "Confirm the default branch"
     GS_LESSON_FORK_BRANCH="${GS_STATE_BRANCH:-main}"
+    ui_info "Choose which upstream branch to fast-forward into your local branch."
     ui_info "Current local branch: ${GS_STATE_BRANCH:-unknown}"
     input_text "Upstream branch to merge (default ${GS_LESSON_FORK_BRANCH}): " 1 || return 1
     if [ -n "$(input_trim "${GS_INPUT_LAST}")" ]; then
@@ -129,11 +134,13 @@ lesson_sync_fork() {
     fi
 
     lesson_step_begin "Fast-forward the local branch from upstream"
+    ui_info "Fast-forward means: move your branch forward when history is a straight line."
+    ui_muted "GitStart uses --ff-only so it stops instead of creating a merge conflict."
     if ! lesson_teach_exact_command \
         "git merge --ff-only upstream/${GS_LESSON_FORK_BRANCH}" \
         lesson_fork_run_ff \
-        "A fast-forward-only merge keeps history linear when possible." \
-        "Your local branch includes upstream commits"
+        "Update your local branch from upstream only when no divergence exists." \
+        "Your local branch includes upstream commits."
     then
         lesson_stop_safe \
             "The local branch and upstream branch diverged or the merge failed." \
@@ -144,11 +151,12 @@ lesson_sync_fork() {
     fi
 
     lesson_step_begin "Push the updated branch to origin"
+    ui_info "Now publish the updated local branch to your fork on origin."
     if ! lesson_teach_exact_command \
         "git push origin ${GS_STATE_BRANCH}" \
         lesson_fork_run_push_origin \
-        "Push updates your fork after a successful upstream sync." \
-        "origin has the updated branch"
+        "Update your fork after a successful upstream sync." \
+        "origin has the updated branch."
     then
         lesson_explain_offline "git push"
         ui_info "Your local fast-forward update is preserved"

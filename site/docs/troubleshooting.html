@@ -30,7 +30,13 @@
   <p>This is a local SSL check on your machine or network. GitStart is not broken.</p>
   <p>Try the launch command with revocation checking disabled for this download:</p>
   <pre>bash -c "$(curl -fsSL --ssl-no-revoke https://richardp23.github.io/gitstart-lite/run)"</pre>
-  <p>If that still fails, download the release in your browser. See <a href="offline.html">download and run</a>.</p>
+  <p>Some networks still block every <code>curl</code> path. Use PowerShell or your browser instead:</p>
+  <pre>powershell -Command "Invoke-WebRequest -Uri 'https://richardp23.github.io/gitstart-lite/releases/v0.3.0/gitstart.sh' -OutFile gitstart.sh"
+powershell -Command "Invoke-WebRequest -Uri 'https://richardp23.github.io/gitstart-lite/releases/v0.3.0/gitstart.sh.sha256' -OutFile gitstart.sh.sha256"</pre>
+  <p>Then in Git Bash:</p>
+  <pre>sha256sum -c gitstart.sh.sha256
+bash gitstart.sh</pre>
+  <p>Or open the release links in your browser. See <a href="offline.html">download and run</a>.</p>
   <p>School or office networks sometimes block revocation checks. Ask your instructor if the problem continues.</p>
 
   <h2>Checksum verification failed</h2>
@@ -45,7 +51,7 @@
   <p>Install a checksum tool, or download the release and verify the checksum on another machine.</p>
 
   <h2>Download and run</h2>
-  <p>Download <code>releases/v0.2.1/gitstart.sh</code> and <code>gitstart.sh.sha256</code>. Verify the checksum. Then run:</p>
+  <p>Download <code>releases/v0.3.0/gitstart.sh</code> and <code>gitstart.sh.sha256</code>. Verify the checksum. Then run:</p>
   <pre>bash gitstart.sh</pre>
   <p>See <a href="offline.html">download and run</a> for full steps.</p>
 

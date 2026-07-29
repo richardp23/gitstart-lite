@@ -1,7 +1,7 @@
 # GitStart Software Requirements Specification
 
 Document ID: GS-SRS-001  
-Version: 0.2.1
+Version: 0.3.0
 Status: Draft for implementation  
 Date: 2026-07-28  
 Primary audience: Project owner, developers, testers, and instructors
@@ -435,7 +435,7 @@ The first list shall include:
 
 **FR-142** The application shall not read the contents of a suspected secret file.
 
-**FR-143** The application shall recommend a `.gitignore` review when a suspected secret or generated file is present.
+**FR-143** The application shall recommend a `.gitignore` review when a suspected secret or generated file is present. Before that decision, the application shall explain what a `.gitignore` file is.
 
 **FR-144** The application shall not upload a file name or file content to the GitStart host.
 

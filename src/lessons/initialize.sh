@@ -26,6 +26,8 @@ lesson_initialize_set_identity() {
     fi
 
     ui_warning "Git needs your name and email before a commit."
+    ui_info "Why: every commit records an author. Remotes and classmates use this to see who saved the change."
+    ui_muted "Use your real class name and school email unless your instructor says otherwise."
     if [ -z "${name}" ]; then
         input_text "Your Git author name: " || return 1
         name="$(input_trim "${GS_INPUT_LAST}")"
@@ -36,7 +38,9 @@ lesson_initialize_set_identity() {
     fi
 
     scope="local"
-    ui_muted "Local config affects only this project."
+    ui_info "Where should Git store this author info?"
+    ui_muted "Local config: only this project. Recommended for class work."
+    ui_muted "Global config: every Git project on this computer."
     if input_confirm "Save in this project's Git config?"; then
         scope="local"
     else
@@ -150,8 +154,8 @@ lesson_initialize_repository() {
     if ! lesson_teach_exact_command \
         "pwd" \
         lesson_initialize_run_pwd \
-        "pwd prints the folder you are in." \
-        "You see the full path."
+        "Confirm you are in the project folder before any Git command." \
+        "You see the full path of the current folder."
     then
         return 1
     fi
@@ -164,13 +168,14 @@ lesson_initialize_repository() {
     if ! lesson_teach_exact_command \
         "${list_cmd}" \
         lesson_initialize_run_ls \
-        "List files before Git tracks them." \
+        "Look at the files before Git starts tracking them." \
         "You see names in this folder."
     then
         return 1
     fi
 
-    lesson_step_begin "Review before staging"
+    lesson_step_begin "Protect secrets before Git tracks files"
+    ui_info "Before git add, decide what Git should ignore."
     safety_review_directory "$(pwd)" || true
     if ! safety_ensure_gitignore_review "$(pwd)"; then
         return 1
@@ -188,17 +193,19 @@ lesson_initialize_repository() {
 
     if git_state_is_nested "$(pwd)"; then
         ui_warning "This directory may be inside another Git repository"
+        ui_info "A nested repository can confuse later Git commands."
         if ! input_confirm "Continue anyway?"; then
             return 1
         fi
     fi
 
     lesson_step_begin "Initialize the repository"
+    ui_info "A repository is a folder that Git can track over time."
     if ! lesson_teach_exact_command \
         "git init" \
         lesson_initialize_run_init \
-        "git init starts a new local repository here." \
-        "Git creates a .git folder."
+        "Start a new local repository in this folder." \
+        "Git creates a hidden .git folder that stores history."
     then
         return 1
     fi
@@ -215,11 +222,12 @@ lesson_initialize_repository() {
     lesson_initialize_apply_pending_identity || return 1
 
     lesson_step_begin "Name the branch main"
+    ui_info "A branch is a named line of work. Classroom remotes usually start with main."
     if ! lesson_teach_exact_command \
         "git branch -M main" \
         lesson_initialize_run_branch_main \
-        "Classroom remotes often use the branch name main." \
-        "The branch is named main."
+        "Rename the current branch to main so it matches common classroom remotes." \
+        "The current branch is named main."
     then
         return 1
     fi
@@ -228,18 +236,20 @@ lesson_initialize_repository() {
     if ! lesson_teach_exact_command \
         "git status" \
         lesson_initialize_run_status \
-        "git status shows what Git sees right now." \
-        "You see untracked or staged files."
+        "Ask Git what it sees before you stage files." \
+        "You see untracked files and the current branch."
     then
         return 1
     fi
 
     lesson_step_begin "Stage files"
+    ui_info "Staging means: choose which changes go into the next commit."
+    ui_muted "git add . stages the files in this folder. Names listed in .gitignore stay out."
     if ! lesson_teach_exact_command \
         "git add ." \
         lesson_initialize_run_add \
-        "git add . stages files for the next commit (respects .gitignore)." \
-        "Files are ready to commit."
+        "Prepare project files for the first commit. Skip names listed in .gitignore." \
+        "Selected files are staged and ready to commit."
     then
         return 1
     fi
@@ -247,11 +257,17 @@ lesson_initialize_repository() {
     ui_muted "Staged paths: ${GS_STATE_DIRTY_COUNT}"
 
     lesson_step_begin "Create the first commit"
+    ui_info "A commit is a saved snapshot. Write a short message that describes the change."
+    ui_muted "Keep the first line short. ${GS_LIMIT_COMMIT_MSG} characters or fewer."
     while true; do
         input_text "Commit message: " || return 1
         GS_LESSON_INIT_COMMIT_MSG="$(input_trim "${GS_INPUT_LAST}")"
         if [ "${#GS_LESSON_INIT_COMMIT_MSG}" -gt "${GS_LIMIT_COMMIT_MSG}" ]; then
             ui_warning "Use ${GS_LIMIT_COMMIT_MSG} characters or fewer."
+            continue
+        fi
+        if [ -z "${GS_LESSON_INIT_COMMIT_MSG}" ]; then
+            ui_warning "The commit message cannot be empty."
             continue
         fi
         break
@@ -260,8 +276,8 @@ lesson_initialize_repository() {
     if ! lesson_teach_exact_command \
         "${commit_display}" \
         lesson_initialize_run_commit \
-        "A commit saves a snapshot of the staged files." \
-        "Git stores the commit." \
+        "Save a snapshot of the staged files into Git history." \
+        "Git stores the commit on the current branch." \
         lesson_match_commit_command
     then
         return 1
@@ -278,7 +294,8 @@ lesson_initialize_repository() {
     ui_success "Local commit is complete."
 
     lesson_step_begin "Add the origin remote"
-    ui_info "Next you connect this folder to a remote repository on a hosting service."
+    ui_info "A remote is a named link to a repository on a hosting service."
+    ui_info "origin is the usual name for your own remote repository."
     ui_info "The remote URL is the HTTPS address of that empty repository."
     ui_muted "Many services host Git. GitHub is one common example."
     ui_muted "On GitHub: New repository → create it empty (skip README if this folder already has files)."
@@ -307,8 +324,8 @@ lesson_initialize_repository() {
     if ! lesson_teach_exact_command \
         "git remote add origin $(printf '%q' "${GS_LESSON_INIT_REMOTE_URL}")" \
         lesson_initialize_run_remote_add \
-        "A remote named origin points to your hosting service repository." \
-        "Git stores the remote URL under the name origin"
+        "Save the hosting service URL under the name origin." \
+        "Git stores the remote URL under the name origin."
     then
         return 1
     fi
@@ -317,20 +334,22 @@ lesson_initialize_repository() {
     if ! lesson_teach_exact_command \
         "git remote -v" \
         lesson_initialize_run_remote_v \
-        "git remote -v lists remote names and sanitized fetch and push URLs." \
-        "You see origin configured for fetch and push"
+        "Check that origin points to the URL you expect." \
+        "You see origin configured for fetch and push."
     then
         return 1
     fi
 
     lesson_step_begin "Push the branch and set upstream"
-    ui_info "Push needs a network connection and authentication through your Git credential helper"
-    ui_info "GitStart does not request a password or token"
+    ui_info "Push sends your local commits to the remote."
+    ui_info "The first push also sets upstream tracking so later git push knows where to go."
+    ui_info "Push needs a network connection and authentication through your Git credential helper."
+    ui_info "GitStart does not request a password or token."
     if ! lesson_teach_exact_command \
         "git push -u origin ${GS_STATE_BRANCH:-main}" \
         lesson_initialize_run_push \
-        "The first push publishes your branch and sets upstream tracking." \
-        "The remote branch exists and your local branch tracks it"
+        "Publish your branch to origin and remember that remote as upstream." \
+        "The remote branch exists and your local branch tracks it."
     then
         lesson_explain_offline "git push"
         ui_info "Your local commit remains safe"

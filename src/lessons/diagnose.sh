@@ -17,11 +17,16 @@ lesson_diagnose() {
 
     lesson_begin "Diagnose a Git problem" 1 "${GS_LESSON_DIAGNOSE}"
 
+    ui_info "Diagnosis collects safe local facts about this repository."
+    ui_muted "It does not read secret file contents. It does not send data automatically."
+
     if ! picker_run; then
         # Diagnosis can still run in the current directory.
         ui_info "Using the current directory for diagnosis"
     fi
 
+    lesson_step_begin "Collect local Git facts"
+    ui_info "GitStart inspects branch, remotes, and ahead or behind counts."
     git_state_inspect
 
     report=""

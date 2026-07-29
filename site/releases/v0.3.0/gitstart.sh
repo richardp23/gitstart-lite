@@ -12,7 +12,7 @@ set -o pipefail
 # Application constants. Do not put mutable state in this module.
 
 GS_APP_NAME="GitStart Lite"
-GS_APP_VERSION="0.2.1"
+GS_APP_VERSION="0.3.0"
 GS_APP_ID="gitstart-lite"
 
 # Teaching limits
@@ -1169,7 +1169,8 @@ picker_confirm_and_teach_cd() {
         fi
     fi
     if [ -n "${warn_bits}" ]; then
-        ui_warning "Note: ${warn_bits} found. You will review .gitignore next."
+        ui_warning "Note: ${warn_bits} found."
+        ui_muted "Next you will learn about .gitignore, a file that tells Git what to skip."
     fi
     safety_is_dangerous_directory "${dir}" || true
     if [ "${GS_SAFE_DANGEROUS}" = "1" ]; then
@@ -1788,6 +1789,20 @@ ${name}"
     done
 }
 
+# Explain .gitignore in plain language before any decision (NFR-004, FR-143).
+safety_explain_gitignore() {
+    ui_info "What is a .gitignore file?"
+    ui_print "A .gitignore file tells Git which files to leave alone."
+    ui_print "Git will not stage those files when you run git add ."
+    ui_blank
+    ui_muted "Use it for secrets, such as .env or password files."
+    ui_muted "Use it for generated folders, such as node_modules or build."
+    ui_muted "Your project source files still get tracked as normal."
+    ui_blank
+    ui_print "Without .gitignore, a secret or large generated folder can enter a commit."
+    ui_print "Then it can be pushed to the remote. That is hard to undo safely."
+}
+
 # Show secret and generated warnings for a directory. Return 1 when hits exist.
 safety_review_directory() {
     local dir="$1"
@@ -1801,33 +1816,50 @@ safety_review_directory() {
         has_issue=1
         names="$(printf '%s\n' "${GS_SAFE_SECRET_HITS}" | tr '\n' ',' | sed 's/,$//;s/,/, /g')"
         ui_warning "Secret-looking names: ${names}"
-        ui_muted "File contents were not read. Prefer .gitignore before git add."
+        ui_muted "File contents were not read."
+        ui_muted "A .gitignore file can keep these names out of git add ."
+        ui_muted "Code: ${GS_CODE_SAFE_SECRET}"
     fi
 
     if [ -n "${GS_SAFE_GENERATED_HITS}" ]; then
         has_issue=1
         names="$(printf '%s\n' "${GS_SAFE_GENERATED_HITS}" | tr '\n' ',' | sed 's/,$//;s/,/, /g')"
         ui_warning "Generated folders: ${names}"
-        ui_muted "Prefer .gitignore before git add."
+        ui_muted "These folders are usually built by tools. Do not commit them."
+        ui_muted "A .gitignore file can keep them out of git add ."
     fi
 
     return "${has_issue}"
 }
 
-# Ensure a .gitignore exists or is reviewed when warnings exist.
+# Teach .gitignore, then create or confirm before staging (FR-143, NFR-004).
 safety_ensure_gitignore_review() {
     local dir="$1"
+
+    safety_explain_gitignore
+    ui_blank
+
     if [ ! -f "${dir}/.gitignore" ]; then
-        ui_warning "No .gitignore yet."
-        if input_confirm "Create a basic .gitignore?"; then
+        ui_warning "This folder has no .gitignore file yet."
+        ui_print "GitStart can create a basic starter file for secrets and generated folders."
+        ui_muted "You can edit the file later for your project."
+        if input_confirm "Create a basic .gitignore now?"; then
             safety_write_basic_gitignore "${dir}"
-            ui_success "Created .gitignore."
+            ui_success "Created .gitignore in this folder."
+            ui_muted "It lists common secret names and generated folders."
+            ui_muted "Open the file in your editor if you want to add more names."
         else
-            ui_next "Add .gitignore before you stage private or generated files."
+            ui_warning "Continuing without .gitignore."
+            ui_next "Create one before git add . if this folder has secrets or generated files."
+            if ! input_confirm "Continue without .gitignore?"; then
+                return 1
+            fi
         fi
     else
-        ui_muted ".gitignore found."
-        if ! input_confirm "Continue?"; then
+        ui_success "A .gitignore file is already in this folder."
+        ui_muted "Git will skip names listed in that file when you stage files."
+        if ! input_confirm "Continue with this .gitignore?"; then
+            ui_next "Edit .gitignore in your editor. Then run this lesson again."
             return 1
         fi
     fi
@@ -2017,10 +2049,11 @@ lesson_teach_exact_command() {
     local expected_norm
     local matched
 
-    ui_info "${why}"
+    ui_info "Why: ${why}"
     if [ -n "${result_text}" ]; then
-        ui_muted "Result: ${result_text}"
+        ui_muted "What happens: ${result_text}"
     fi
+    ui_print "Type this command:"
     ui_command "${expected}"
 
     expected_norm="$(input_normalize_command "${expected}")"
@@ -2038,7 +2071,11 @@ lesson_teach_exact_command() {
             case "${typed}" in
                 \?)
                     lesson_draw_board
-                    ui_info "${why}"
+                    ui_info "Why: ${why}"
+                    if [ -n "${result_text}" ]; then
+                        ui_muted "What happens: ${result_text}"
+                    fi
+                    ui_print "Type this command:"
                     ui_command "${expected}"
                     continue
                     ;;
@@ -2355,6 +2392,8 @@ lesson_initialize_set_identity() {
     fi
 
     ui_warning "Git needs your name and email before a commit."
+    ui_info "Why: every commit records an author. Remotes and classmates use this to see who saved the change."
+    ui_muted "Use your real class name and school email unless your instructor says otherwise."
     if [ -z "${name}" ]; then
         input_text "Your Git author name: " || return 1
         name="$(input_trim "${GS_INPUT_LAST}")"
@@ -2365,7 +2404,9 @@ lesson_initialize_set_identity() {
     fi
 
     scope="local"
-    ui_muted "Local config affects only this project."
+    ui_info "Where should Git store this author info?"
+    ui_muted "Local config: only this project. Recommended for class work."
+    ui_muted "Global config: every Git project on this computer."
     if input_confirm "Save in this project's Git config?"; then
         scope="local"
     else
@@ -2479,8 +2520,8 @@ lesson_initialize_repository() {
     if ! lesson_teach_exact_command \
         "pwd" \
         lesson_initialize_run_pwd \
-        "pwd prints the folder you are in." \
-        "You see the full path."
+        "Confirm you are in the project folder before any Git command." \
+        "You see the full path of the current folder."
     then
         return 1
     fi
@@ -2493,13 +2534,14 @@ lesson_initialize_repository() {
     if ! lesson_teach_exact_command \
         "${list_cmd}" \
         lesson_initialize_run_ls \
-        "List files before Git tracks them." \
+        "Look at the files before Git starts tracking them." \
         "You see names in this folder."
     then
         return 1
     fi
 
-    lesson_step_begin "Review before staging"
+    lesson_step_begin "Protect secrets before Git tracks files"
+    ui_info "Before git add, decide what Git should ignore."
     safety_review_directory "$(pwd)" || true
     if ! safety_ensure_gitignore_review "$(pwd)"; then
         return 1
@@ -2517,17 +2559,19 @@ lesson_initialize_repository() {
 
     if git_state_is_nested "$(pwd)"; then
         ui_warning "This directory may be inside another Git repository"
+        ui_info "A nested repository can confuse later Git commands."
         if ! input_confirm "Continue anyway?"; then
             return 1
         fi
     fi
 
     lesson_step_begin "Initialize the repository"
+    ui_info "A repository is a folder that Git can track over time."
     if ! lesson_teach_exact_command \
         "git init" \
         lesson_initialize_run_init \
-        "git init starts a new local repository here." \
-        "Git creates a .git folder."
+        "Start a new local repository in this folder." \
+        "Git creates a hidden .git folder that stores history."
     then
         return 1
     fi
@@ -2544,11 +2588,12 @@ lesson_initialize_repository() {
     lesson_initialize_apply_pending_identity || return 1
 
     lesson_step_begin "Name the branch main"
+    ui_info "A branch is a named line of work. Classroom remotes usually start with main."
     if ! lesson_teach_exact_command \
         "git branch -M main" \
         lesson_initialize_run_branch_main \
-        "Classroom remotes often use the branch name main." \
-        "The branch is named main."
+        "Rename the current branch to main so it matches common classroom remotes." \
+        "The current branch is named main."
     then
         return 1
     fi
@@ -2557,18 +2602,20 @@ lesson_initialize_repository() {
     if ! lesson_teach_exact_command \
         "git status" \
         lesson_initialize_run_status \
-        "git status shows what Git sees right now." \
-        "You see untracked or staged files."
+        "Ask Git what it sees before you stage files." \
+        "You see untracked files and the current branch."
     then
         return 1
     fi
 
     lesson_step_begin "Stage files"
+    ui_info "Staging means: choose which changes go into the next commit."
+    ui_muted "git add . stages the files in this folder. Names listed in .gitignore stay out."
     if ! lesson_teach_exact_command \
         "git add ." \
         lesson_initialize_run_add \
-        "git add . stages files for the next commit (respects .gitignore)." \
-        "Files are ready to commit."
+        "Prepare project files for the first commit. Skip names listed in .gitignore." \
+        "Selected files are staged and ready to commit."
     then
         return 1
     fi
@@ -2576,11 +2623,17 @@ lesson_initialize_repository() {
     ui_muted "Staged paths: ${GS_STATE_DIRTY_COUNT}"
 
     lesson_step_begin "Create the first commit"
+    ui_info "A commit is a saved snapshot. Write a short message that describes the change."
+    ui_muted "Keep the first line short. ${GS_LIMIT_COMMIT_MSG} characters or fewer."
     while true; do
         input_text "Commit message: " || return 1
         GS_LESSON_INIT_COMMIT_MSG="$(input_trim "${GS_INPUT_LAST}")"
         if [ "${#GS_LESSON_INIT_COMMIT_MSG}" -gt "${GS_LIMIT_COMMIT_MSG}" ]; then
             ui_warning "Use ${GS_LIMIT_COMMIT_MSG} characters or fewer."
+            continue
+        fi
+        if [ -z "${GS_LESSON_INIT_COMMIT_MSG}" ]; then
+            ui_warning "The commit message cannot be empty."
             continue
         fi
         break
@@ -2589,8 +2642,8 @@ lesson_initialize_repository() {
     if ! lesson_teach_exact_command \
         "${commit_display}" \
         lesson_initialize_run_commit \
-        "A commit saves a snapshot of the staged files." \
-        "Git stores the commit." \
+        "Save a snapshot of the staged files into Git history." \
+        "Git stores the commit on the current branch." \
         lesson_match_commit_command
     then
         return 1
@@ -2607,7 +2660,8 @@ lesson_initialize_repository() {
     ui_success "Local commit is complete."
 
     lesson_step_begin "Add the origin remote"
-    ui_info "Next you connect this folder to a remote repository on a hosting service."
+    ui_info "A remote is a named link to a repository on a hosting service."
+    ui_info "origin is the usual name for your own remote repository."
     ui_info "The remote URL is the HTTPS address of that empty repository."
     ui_muted "Many services host Git. GitHub is one common example."
     ui_muted "On GitHub: New repository → create it empty (skip README if this folder already has files)."
@@ -2636,8 +2690,8 @@ lesson_initialize_repository() {
     if ! lesson_teach_exact_command \
         "git remote add origin $(printf '%q' "${GS_LESSON_INIT_REMOTE_URL}")" \
         lesson_initialize_run_remote_add \
-        "A remote named origin points to your hosting service repository." \
-        "Git stores the remote URL under the name origin"
+        "Save the hosting service URL under the name origin." \
+        "Git stores the remote URL under the name origin."
     then
         return 1
     fi
@@ -2646,20 +2700,22 @@ lesson_initialize_repository() {
     if ! lesson_teach_exact_command \
         "git remote -v" \
         lesson_initialize_run_remote_v \
-        "git remote -v lists remote names and sanitized fetch and push URLs." \
-        "You see origin configured for fetch and push"
+        "Check that origin points to the URL you expect." \
+        "You see origin configured for fetch and push."
     then
         return 1
     fi
 
     lesson_step_begin "Push the branch and set upstream"
-    ui_info "Push needs a network connection and authentication through your Git credential helper"
-    ui_info "GitStart does not request a password or token"
+    ui_info "Push sends your local commits to the remote."
+    ui_info "The first push also sets upstream tracking so later git push knows where to go."
+    ui_info "Push needs a network connection and authentication through your Git credential helper."
+    ui_info "GitStart does not request a password or token."
     if ! lesson_teach_exact_command \
         "git push -u origin ${GS_STATE_BRANCH:-main}" \
         lesson_initialize_run_push \
-        "The first push publishes your branch and sets upstream tracking." \
-        "The remote branch exists and your local branch tracks it"
+        "Publish your branch to origin and remember that remote as upstream." \
+        "The remote branch exists and your local branch tracks it."
     then
         lesson_explain_offline "git push"
         ui_info "Your local commit remains safe"
@@ -2728,13 +2784,14 @@ lesson_commit_push() {
     fi
 
     lesson_step_begin "Show the current branch and status"
+    ui_info "First look at the current branch and whether files changed."
     ui_info "Current branch: ${GS_STATE_BRANCH:-unknown}"
     git_state_summary
     if ! lesson_teach_exact_command \
         "git status" \
         lesson_commit_push_run_status \
-        "git status shows whether the working tree has changes." \
-        "You see staged and unstaged changes"
+        "Ask Git whether this folder has changes to save." \
+        "You see staged changes, unstaged changes, or a clean tree."
     then
         return 1
     fi
@@ -2750,28 +2807,37 @@ lesson_commit_push() {
     fi
 
     if [ "${GS_STATE_IS_CLEAN}" = "0" ]; then
-        lesson_step_begin "Safety review before staging"
+        lesson_step_begin "Protect secrets before staging"
+        ui_info "Before git add, decide what Git should ignore."
         safety_review_directory "$(pwd)" || true
         if ! safety_ensure_gitignore_review "$(pwd)"; then
             return 1
         fi
 
         lesson_step_begin "Stage changes"
+        ui_info "Staging means: choose which changes go into the next commit."
+        ui_muted "git add . stages the files in this folder. Names listed in .gitignore stay out."
         if ! lesson_teach_exact_command \
             "git add ." \
             lesson_commit_push_run_add \
-            "Staging prepares your changes for a commit." \
-            "Changed files are staged"
+            "Prepare your edited files for a commit. Skip names listed in .gitignore." \
+            "Changed files are staged."
         then
             return 1
         fi
 
         lesson_step_begin "Commit changes"
+        ui_info "A commit is a saved snapshot. Write a short message that describes the change."
+        ui_muted "Keep the first line short. ${GS_LIMIT_COMMIT_MSG} characters or fewer."
         while true; do
             input_text "Enter a commit message: " || return 1
             GS_LESSON_CP_COMMIT_MSG="$(input_trim "${GS_INPUT_LAST}")"
             if [ "${#GS_LESSON_CP_COMMIT_MSG}" -gt "${GS_LIMIT_COMMIT_MSG}" ]; then
                 ui_warning "Use ${GS_LIMIT_COMMIT_MSG} characters or fewer for the first line"
+                continue
+            fi
+            if [ -z "${GS_LESSON_CP_COMMIT_MSG}" ]; then
+                ui_warning "The commit message cannot be empty."
                 continue
             fi
             break
@@ -2780,7 +2846,7 @@ lesson_commit_push() {
         if ! lesson_teach_exact_command \
             "${commit_display}" \
             lesson_commit_push_run_commit \
-            "A commit saves your staged changes in history." \
+            "Save your staged changes into Git history." \
             "A new commit exists on the current branch." \
             lesson_match_commit_command
         then
@@ -2790,6 +2856,8 @@ lesson_commit_push() {
     fi
 
     lesson_step_begin "Fetch remote information"
+    ui_info "Fetch downloads remote updates without changing your local files."
+    ui_muted "This helps you check if the remote moved ahead before you push."
     if [ "${GS_STATE_HAS_ORIGIN}" != "1" ]; then
         lesson_stop_safe \
             "No origin remote is configured." \
@@ -2802,8 +2870,8 @@ lesson_commit_push() {
     if ! lesson_teach_exact_command \
         "git fetch" \
         lesson_commit_push_run_fetch \
-        "Fetch updates remote tracking data without changing your working tree." \
-        "Remote branch information is current"
+        "Update remote tracking data so you know if the remote has new commits." \
+        "Remote branch information is current."
     then
         lesson_explain_offline "git fetch"
         ui_info "Your local commit is safe"
@@ -2822,6 +2890,7 @@ lesson_commit_push() {
             ;;
         BEHIND)
             ui_warning "The local branch is behind the remote branch"
+            ui_info "Someone else pushed commits you do not have yet."
             ui_next "Use the update lesson to apply a fast-forward update first"
             return 1
             ;;
@@ -2829,12 +2898,13 @@ lesson_commit_push() {
             ;;
         UNTRACKED)
             ui_warning "No upstream tracking branch is set"
+            ui_info "Upstream tracking tells git push which remote branch to update."
             if input_confirm "Push and set upstream to origin/${GS_STATE_BRANCH}?"; then
                 if ! lesson_teach_exact_command \
                     "git push -u origin ${GS_STATE_BRANCH}" \
                     lesson_commit_push_run_push_u \
-                    "Push publishes commits and can set upstream tracking." \
-                    "The remote branch tracks your local branch"
+                    "Publish your commits and remember origin as the upstream for this branch." \
+                    "The remote branch tracks your local branch."
                 then
                     lesson_explain_offline "git push"
                     return 1
@@ -2859,11 +2929,12 @@ lesson_commit_push() {
     fi
 
     lesson_step_begin "Push local commits"
+    ui_info "Push sends your local commits to the remote named origin."
     if ! lesson_teach_exact_command \
         "git push" \
         lesson_commit_push_run_push \
-        "Push sends local commits that are ahead of the upstream branch." \
-        "The remote branch includes your commits"
+        "Send local commits that are ahead of the upstream branch." \
+        "The remote branch includes your commits."
     then
         lesson_explain_offline "git push"
         ui_info "Your local commit is safe"
@@ -2916,6 +2987,8 @@ lesson_update_clone() {
     fi
 
     lesson_step_begin "Require a clean working tree"
+    ui_info "A clean working tree means you have no unsaved local edits."
+    ui_muted "Update is safer when Git can move your branch forward without mixing in local edits."
     git_state_summary
     if [ "${GS_STATE_IS_CLEAN}" = "0" ]; then
         ui_warning "The working tree has local changes"
@@ -2946,11 +3019,12 @@ lesson_update_clone() {
     fi
 
     lesson_step_begin "Fetch remote updates"
+    ui_info "Fetch downloads new commits from the remote without changing your files."
     if ! lesson_teach_exact_command \
         "git fetch" \
         lesson_update_run_fetch \
-        "Fetch downloads new commits without changing your files." \
-        "Remote tracking branches are updated"
+        "Download remote commits so you can compare your branch with the remote." \
+        "Remote tracking branches are updated."
     then
         lesson_explain_offline "git fetch"
         return 1
@@ -2959,6 +3033,8 @@ lesson_update_clone() {
     git_state_inspect
     ui_info "Local branch relation to upstream: ${GS_STATE_RELATION}"
     ui_info "Ahead: ${GS_STATE_AHEAD}  Behind: ${GS_STATE_BEHIND}"
+    ui_muted "Ahead means you have local commits not on the remote."
+    ui_muted "Behind means the remote has commits you do not have yet."
 
     case "${GS_STATE_RELATION}" in
         EQUAL)
@@ -2993,11 +3069,13 @@ lesson_update_clone() {
     esac
 
     lesson_step_begin "Apply a fast-forward-only update"
+    ui_info "Fast-forward means: move your branch pointer forward to match the remote."
+    ui_muted "GitStart uses --ff-only so it will stop instead of creating a merge conflict."
     if ! lesson_teach_exact_command \
         "git pull --ff-only" \
         lesson_update_run_ff \
-        "A fast-forward-only pull updates your branch when no divergence exists." \
-        "Your local branch matches the upstream branch"
+        "Update your local branch only when the remote is a straight continuation of your history." \
+        "Your local branch matches the upstream branch."
     then
         lesson_stop_safe \
             "The fast-forward update did not complete." \
@@ -3068,15 +3146,16 @@ lesson_sync_fork() {
     fi
 
     lesson_step_begin "Explain origin and upstream"
-    ui_info "origin is your fork on the hosting service"
-    ui_info "upstream is the original repository that you forked"
-    ui_info "You fetch from upstream. You push to origin"
+    ui_info "A fork is your copy of someone else's project on a hosting service."
+    ui_info "origin is your fork. You push to origin."
+    ui_info "upstream is the original project. You fetch from upstream."
+    ui_muted "This lesson updates your local branch from upstream, then pushes to your fork."
 
     if ! lesson_teach_exact_command \
         "git remote -v" \
         lesson_fork_run_remote_v \
-        "List remotes to see which URLs are configured." \
-        "You see remote names and sanitized URLs"
+        "List remotes so you can see which URLs are configured." \
+        "You see remote names and sanitized URLs."
     then
         return 1
     fi
@@ -3093,6 +3172,8 @@ lesson_sync_fork() {
 
     if [ "${GS_STATE_HAS_UPSTREAM_REMOTE}" != "1" ]; then
         lesson_step_begin "Add the upstream remote"
+        ui_info "You need the HTTPS URL of the original repository you forked."
+        ui_muted "Example: https://github.com/ORIGINAL_OWNER/PROJECT.git"
         while true; do
             input_text "Enter the original repository HTTPS URL: " || return 1
             GS_LESSON_FORK_UPSTREAM_URL="$(input_trim "${GS_INPUT_LAST}")"
@@ -3104,8 +3185,8 @@ lesson_sync_fork() {
         if ! lesson_teach_exact_command \
             "git remote add upstream $(printf '%q' "${GS_LESSON_FORK_UPSTREAM_URL}")" \
             lesson_fork_run_add_upstream \
-            "upstream points to the original project repository." \
-            "Git stores the upstream remote URL"
+            "Save the original project URL under the name upstream." \
+            "Git stores the upstream remote URL."
         then
             return 1
         fi
@@ -3123,11 +3204,12 @@ lesson_sync_fork() {
     fi
 
     lesson_step_begin "Fetch from upstream"
+    ui_info "Fetch downloads commits from the original project without changing your files."
     if ! lesson_teach_exact_command \
         "git fetch upstream" \
         lesson_fork_run_fetch_upstream \
-        "Fetch downloads commits from the original repository." \
-        "upstream remote-tracking branches are updated"
+        "Download new commits from the original repository." \
+        "upstream remote-tracking branches are updated."
     then
         lesson_explain_offline "git fetch upstream"
         return 1
@@ -3135,6 +3217,7 @@ lesson_sync_fork() {
 
     lesson_step_begin "Confirm the default branch"
     GS_LESSON_FORK_BRANCH="${GS_STATE_BRANCH:-main}"
+    ui_info "Choose which upstream branch to fast-forward into your local branch."
     ui_info "Current local branch: ${GS_STATE_BRANCH:-unknown}"
     input_text "Upstream branch to merge (default ${GS_LESSON_FORK_BRANCH}): " 1 || return 1
     if [ -n "$(input_trim "${GS_INPUT_LAST}")" ]; then
@@ -3150,11 +3233,13 @@ lesson_sync_fork() {
     fi
 
     lesson_step_begin "Fast-forward the local branch from upstream"
+    ui_info "Fast-forward means: move your branch forward when history is a straight line."
+    ui_muted "GitStart uses --ff-only so it stops instead of creating a merge conflict."
     if ! lesson_teach_exact_command \
         "git merge --ff-only upstream/${GS_LESSON_FORK_BRANCH}" \
         lesson_fork_run_ff \
-        "A fast-forward-only merge keeps history linear when possible." \
-        "Your local branch includes upstream commits"
+        "Update your local branch from upstream only when no divergence exists." \
+        "Your local branch includes upstream commits."
     then
         lesson_stop_safe \
             "The local branch and upstream branch diverged or the merge failed." \
@@ -3165,11 +3250,12 @@ lesson_sync_fork() {
     fi
 
     lesson_step_begin "Push the updated branch to origin"
+    ui_info "Now publish the updated local branch to your fork on origin."
     if ! lesson_teach_exact_command \
         "git push origin ${GS_STATE_BRANCH}" \
         lesson_fork_run_push_origin \
-        "Push updates your fork after a successful upstream sync." \
-        "origin has the updated branch"
+        "Update your fork after a successful upstream sync." \
+        "origin has the updated branch."
     then
         lesson_explain_offline "git push"
         ui_info "Your local fast-forward update is preserved"
@@ -3202,11 +3288,16 @@ lesson_diagnose() {
 
     lesson_begin "Diagnose a Git problem" 1 "${GS_LESSON_DIAGNOSE}"
 
+    ui_info "Diagnosis collects safe local facts about this repository."
+    ui_muted "It does not read secret file contents. It does not send data automatically."
+
     if ! picker_run; then
         # Diagnosis can still run in the current directory.
         ui_info "Using the current directory for diagnosis"
     fi
 
+    lesson_step_begin "Collect local Git facts"
+    ui_info "GitStart inspects branch, remotes, and ahead or behind counts."
     git_state_inspect
 
     report=""

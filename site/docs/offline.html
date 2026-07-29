@@ -15,9 +15,12 @@
   <p>GitStart runs on your machine with Bash and Git. Use these steps when you prefer a direct download instead of the one-line bootstrap.</p>
 
   <h2>Download the release</h2>
-  <pre>curl -fsSL -O https://richardp23.github.io/gitstart-lite/releases/v0.2.1/gitstart.sh
-curl -fsSL -O https://richardp23.github.io/gitstart-lite/releases/v0.2.1/gitstart.sh.sha256</pre>
+  <pre>curl -fsSL -O https://richardp23.github.io/gitstart-lite/releases/v0.3.0/gitstart.sh
+curl -fsSL -O https://richardp23.github.io/gitstart-lite/releases/v0.3.0/gitstart.sh.sha256</pre>
   <p>On Windows Git Bash, add <code>--ssl-no-revoke</code> to each <code>curl</code> command when you see a certificate revocation error.</p>
+  <p>If <code>curl</code> still fails, use PowerShell:</p>
+  <pre>powershell -Command "Invoke-WebRequest -Uri 'https://richardp23.github.io/gitstart-lite/releases/v0.3.0/gitstart.sh' -OutFile gitstart.sh"
+powershell -Command "Invoke-WebRequest -Uri 'https://richardp23.github.io/gitstart-lite/releases/v0.3.0/gitstart.sh.sha256' -OutFile gitstart.sh.sha256"</pre>
 
   <h2>Verify the checksum</h2>
   <pre>sha256sum -c gitstart.sh.sha256</pre>

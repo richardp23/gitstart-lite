@@ -32,6 +32,8 @@ lesson_update_clone() {
     fi
 
     lesson_step_begin "Require a clean working tree"
+    ui_info "A clean working tree means you have no unsaved local edits."
+    ui_muted "Update is safer when Git can move your branch forward without mixing in local edits."
     git_state_summary
     if [ "${GS_STATE_IS_CLEAN}" = "0" ]; then
         ui_warning "The working tree has local changes"
@@ -62,11 +64,12 @@ lesson_update_clone() {
     fi
 
     lesson_step_begin "Fetch remote updates"
+    ui_info "Fetch downloads new commits from the remote without changing your files."
     if ! lesson_teach_exact_command \
         "git fetch" \
         lesson_update_run_fetch \
-        "Fetch downloads new commits without changing your files." \
-        "Remote tracking branches are updated"
+        "Download remote commits so you can compare your branch with the remote." \
+        "Remote tracking branches are updated."
     then
         lesson_explain_offline "git fetch"
         return 1
@@ -75,6 +78,8 @@ lesson_update_clone() {
     git_state_inspect
     ui_info "Local branch relation to upstream: ${GS_STATE_RELATION}"
     ui_info "Ahead: ${GS_STATE_AHEAD}  Behind: ${GS_STATE_BEHIND}"
+    ui_muted "Ahead means you have local commits not on the remote."
+    ui_muted "Behind means the remote has commits you do not have yet."
 
     case "${GS_STATE_RELATION}" in
         EQUAL)
@@ -109,11 +114,13 @@ lesson_update_clone() {
     esac
 
     lesson_step_begin "Apply a fast-forward-only update"
+    ui_info "Fast-forward means: move your branch pointer forward to match the remote."
+    ui_muted "GitStart uses --ff-only so it will stop instead of creating a merge conflict."
     if ! lesson_teach_exact_command \
         "git pull --ff-only" \
         lesson_update_run_ff \
-        "A fast-forward-only pull updates your branch when no divergence exists." \
-        "Your local branch matches the upstream branch"
+        "Update your local branch only when the remote is a straight continuation of your history." \
+        "Your local branch matches the upstream branch."
     then
         lesson_stop_safe \
             "The fast-forward update did not complete." \

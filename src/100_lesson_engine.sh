@@ -132,10 +132,11 @@ lesson_teach_exact_command() {
     local expected_norm
     local matched
 
-    ui_info "${why}"
+    ui_info "Why: ${why}"
     if [ -n "${result_text}" ]; then
-        ui_muted "Result: ${result_text}"
+        ui_muted "What happens: ${result_text}"
     fi
+    ui_print "Type this command:"
     ui_command "${expected}"
 
     expected_norm="$(input_normalize_command "${expected}")"
@@ -153,7 +154,11 @@ lesson_teach_exact_command() {
             case "${typed}" in
                 \?)
                     lesson_draw_board
-                    ui_info "${why}"
+                    ui_info "Why: ${why}"
+                    if [ -n "${result_text}" ]; then
+                        ui_muted "What happens: ${result_text}"
+                    fi
+                    ui_print "Type this command:"
                     ui_command "${expected}"
                     continue
                     ;;

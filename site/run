@@ -8,30 +8,107 @@ set -o pipefail
 BASE_URL="${GITSTART_BASE_URL:-https://richardp23.github.io/gitstart-lite}"
 STABLE_FILE="${BASE_URL}/stable.txt"
 
-download_file() {
+# Return 0 when Git Bash or MSYS is likely on Windows.
+boot_is_windows_shell() {
+    case "$(uname -s 2>/dev/null)" in
+        MINGW*|MSYS*|CYGWIN*) return 0 ;;
+    esac
+    return 1
+}
+
+# Try one curl binary. Return 0 on success.
+boot_try_curl_bin() {
+    local bin="$1"
+    local url="$2"
+    local dest="$3"
+    shift 3
+    if [ ! -x "${bin}" ] && ! command -v "${bin}" >/dev/null 2>&1; then
+        return 1
+    fi
+    if [ "${dest}" = "-" ]; then
+        "${bin}" "$@" -fsSL "${url}" 2>/dev/null
+        return $?
+    fi
+    "${bin}" "$@" -fsSL "${url}" -o "${dest}" 2>/dev/null
+}
+
+# Download a URL to a file or stdout. Try several transports on Windows.
+boot_download() {
     local url="$1"
     local dest="$2"
-    if command -v curl >/dev/null 2>&1; then
-        if curl -fsSL "${url}" -o "${dest}"; then
+    local win_curl="/c/Windows/System32/curl.exe"
+
+    if boot_is_windows_shell; then
+        if boot_try_curl_bin curl "${url}" "${dest}" --ssl-no-revoke; then
             return 0
         fi
-        # Git for Windows curl may fail revocation checks on some networks.
-        if curl -fsSL --ssl-no-revoke "${url}" -o "${dest}" 2>/dev/null; then
+        if boot_try_curl_bin curl "${url}" "${dest}"; then
             return 0
+        fi
+        if boot_try_curl_bin "${win_curl}" "${url}" "${dest}" --ssl-no-revoke; then
+            return 0
+        fi
+        if boot_try_curl_bin "${win_curl}" "${url}" "${dest}"; then
+            return 0
+        fi
+        if command -v wget >/dev/null 2>&1; then
+            if [ "${dest}" = "-" ]; then
+                wget -q -O - "${url}" 2>/dev/null
+                return $?
+            fi
+            wget -q -O "${dest}" "${url}" 2>/dev/null
+            return $?
+        fi
+        if command -v powershell.exe >/dev/null 2>&1 && [ "${dest}" != "-" ]; then
+            powershell.exe -NoProfile -Command \
+                "Invoke-WebRequest -Uri '${url}' -OutFile '${dest}' -UseBasicParsing" \
+                >/dev/null 2>&1
+            if [ -s "${dest}" ]; then
+                return 0
+            fi
+            rm -f "${dest}" 2>/dev/null || true
         fi
         return 1
     fi
+
+    if boot_try_curl_bin curl "${url}" "${dest}"; then
+        return 0
+    fi
     if command -v wget >/dev/null 2>&1; then
+        if [ "${dest}" = "-" ]; then
+            wget -q -O - "${url}"
+            return $?
+        fi
         wget -q -O "${dest}" "${url}"
         return $?
     fi
-    printf '[ERROR] curl or wget is required to download GitStart.\n' >&2
     return 1
+}
+
+boot_print_download_help() {
+    local app_url="$1"
+    local sum_url="$2"
+    printf 'Download failed on this machine or network.\n' >&2
+    printf 'Code: GS-BOOT-002\n' >&2
+    printf '\n' >&2
+    printf 'Try one of these safe options:\n' >&2
+    printf '\n' >&2
+    printf '1) Browser download\n' >&2
+    printf '   %s\n' "${app_url}" >&2
+    printf '   %s\n' "${sum_url}" >&2
+    printf '   Then in Git Bash: sha256sum -c gitstart.sh.sha256 && bash gitstart.sh\n' >&2
+    printf '\n' >&2
+    printf '2) PowerShell (Windows)\n' >&2
+    printf "   powershell -Command \"Invoke-WebRequest -Uri '%s' -OutFile gitstart.sh\"\n" "${app_url}" >&2
+    printf "   powershell -Command \"Invoke-WebRequest -Uri '%s' -OutFile gitstart.sh.sha256\"\n" "${sum_url}" >&2
+    printf '   Then in Git Bash: sha256sum -c gitstart.sh.sha256 && bash gitstart.sh\n' >&2
+    printf '\n' >&2
+    printf 'See %s/docs/offline.html\n' "${BASE_URL}" >&2
 }
 
 read_stable_version() {
     local raw
-    if ! raw="$(curl -fsSL "${STABLE_FILE}" 2>/dev/null || curl -fsSL --ssl-no-revoke "${STABLE_FILE}" 2>/dev/null)"; then
+    if ! raw="$(boot_download "${STABLE_FILE}" "-")"; then
         printf 'v0.1.0\n'
         return 0
     fi
@@ -82,20 +159,18 @@ printf '[INFO] GitStart Lite bootstrap\n'
 printf '[INFO] Version: v%s\n' "${VERSION}"
 printf '[INFO] Source: %s\n' "${APP_URL}"
 
-if ! download_file "${APP_URL}" "${GS_TMP_APP}"; then
+if ! boot_download "${APP_URL}" "${GS_TMP_APP}"; then
     printf '[ERROR] Download failed.\n' >&2
-    printf 'Check the network connection and BASE_URL setting.\n' >&2
-    printf 'On Windows Git Bash, retry the launch with curl --ssl-no-revoke.\n' >&2
-    printf 'Code: GS-BOOT-002\n' >&2
+    boot_print_download_help "${APP_URL}" "${SUM_URL}"
     exit 1
 fi
 
 chmod +x "${GS_TMP_APP}" 2>/dev/null || true
 
 if command -v sha256sum >/dev/null 2>&1; then
-    if ! download_file "${SUM_URL}" "${GS_TMP_SUM}"; then
+    if ! boot_download "${SUM_URL}" "${GS_TMP_SUM}"; then
         printf '[ERROR] Checksum file download failed.\n' >&2
-        printf 'Code: GS-BOOT-002\n' >&2
+        boot_print_download_help "${APP_URL}" "${SUM_URL}"
         exit 1
     fi
     (
@@ -108,9 +183,9 @@ if command -v sha256sum >/dev/null 2>&1; then
         exit 1
     }
 elif command -v shasum >/dev/null 2>&1; then
-    if ! download_file "${SUM_URL}" "${GS_TMP_SUM}"; then
+    if ! boot_download "${SUM_URL}" "${GS_TMP_SUM}"; then
         printf '[ERROR] Checksum file download failed.\n' >&2
-        printf 'Code: GS-BOOT-002\n' >&2
+        boot_print_download_help "${APP_URL}" "${SUM_URL}"
         exit 1
     fi
     (

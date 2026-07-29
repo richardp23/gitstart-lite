@@ -53,13 +53,14 @@ lesson_commit_push() {
     fi
 
     lesson_step_begin "Show the current branch and status"
+    ui_info "First look at the current branch and whether files changed."
     ui_info "Current branch: ${GS_STATE_BRANCH:-unknown}"
     git_state_summary
     if ! lesson_teach_exact_command \
         "git status" \
         lesson_commit_push_run_status \
-        "git status shows whether the working tree has changes." \
-        "You see staged and unstaged changes"
+        "Ask Git whether this folder has changes to save." \
+        "You see staged changes, unstaged changes, or a clean tree."
     then
         return 1
     fi
@@ -75,28 +76,37 @@ lesson_commit_push() {
     fi
 
     if [ "${GS_STATE_IS_CLEAN}" = "0" ]; then
-        lesson_step_begin "Safety review before staging"
+        lesson_step_begin "Protect secrets before staging"
+        ui_info "Before git add, decide what Git should ignore."
         safety_review_directory "$(pwd)" || true
         if ! safety_ensure_gitignore_review "$(pwd)"; then
             return 1
         fi
 
         lesson_step_begin "Stage changes"
+        ui_info "Staging means: choose which changes go into the next commit."
+        ui_muted "git add . stages the files in this folder. Names listed in .gitignore stay out."
         if ! lesson_teach_exact_command \
             "git add ." \
             lesson_commit_push_run_add \
-            "Staging prepares your changes for a commit." \
-            "Changed files are staged"
+            "Prepare your edited files for a commit. Skip names listed in .gitignore." \
+            "Changed files are staged."
         then
             return 1
         fi
 
         lesson_step_begin "Commit changes"
+        ui_info "A commit is a saved snapshot. Write a short message that describes the change."
+        ui_muted "Keep the first line short. ${GS_LIMIT_COMMIT_MSG} characters or fewer."
         while true; do
             input_text "Enter a commit message: " || return 1
             GS_LESSON_CP_COMMIT_MSG="$(input_trim "${GS_INPUT_LAST}")"
             if [ "${#GS_LESSON_CP_COMMIT_MSG}" -gt "${GS_LIMIT_COMMIT_MSG}" ]; then
                 ui_warning "Use ${GS_LIMIT_COMMIT_MSG} characters or fewer for the first line"
+                continue
+            fi
+            if [ -z "${GS_LESSON_CP_COMMIT_MSG}" ]; then
+                ui_warning "The commit message cannot be empty."
                 continue
             fi
             break
@@ -105,7 +115,7 @@ lesson_commit_push() {
         if ! lesson_teach_exact_command \
             "${commit_display}" \
             lesson_commit_push_run_commit \
-            "A commit saves your staged changes in history." \
+            "Save your staged changes into Git history." \
             "A new commit exists on the current branch." \
             lesson_match_commit_command
         then
@@ -115,6 +125,8 @@ lesson_commit_push() {
     fi
 
     lesson_step_begin "Fetch remote information"
+    ui_info "Fetch downloads remote updates without changing your local files."
+    ui_muted "This helps you check if the remote moved ahead before you push."
     if [ "${GS_STATE_HAS_ORIGIN}" != "1" ]; then
         lesson_stop_safe \
             "No origin remote is configured." \
@@ -127,8 +139,8 @@ lesson_commit_push() {
     if ! lesson_teach_exact_command \
         "git fetch" \
         lesson_commit_push_run_fetch \
-        "Fetch updates remote tracking data without changing your working tree." \
-        "Remote branch information is current"
+        "Update remote tracking data so you know if the remote has new commits." \
+        "Remote branch information is current."
     then
         lesson_explain_offline "git fetch"
         ui_info "Your local commit is safe"
@@ -147,6 +159,7 @@ lesson_commit_push() {
             ;;
         BEHIND)
             ui_warning "The local branch is behind the remote branch"
+            ui_info "Someone else pushed commits you do not have yet."
             ui_next "Use the update lesson to apply a fast-forward update first"
             return 1
             ;;
@@ -154,12 +167,13 @@ lesson_commit_push() {
             ;;
         UNTRACKED)
             ui_warning "No upstream tracking branch is set"
+            ui_info "Upstream tracking tells git push which remote branch to update."
             if input_confirm "Push and set upstream to origin/${GS_STATE_BRANCH}?"; then
                 if ! lesson_teach_exact_command \
                     "git push -u origin ${GS_STATE_BRANCH}" \
                     lesson_commit_push_run_push_u \
-                    "Push publishes commits and can set upstream tracking." \
-                    "The remote branch tracks your local branch"
+                    "Publish your commits and remember origin as the upstream for this branch." \
+                    "The remote branch tracks your local branch."
                 then
                     lesson_explain_offline "git push"
                     return 1
@@ -184,11 +198,12 @@ lesson_commit_push() {
     fi
 
     lesson_step_begin "Push local commits"
+    ui_info "Push sends your local commits to the remote named origin."
     if ! lesson_teach_exact_command \
         "git push" \
         lesson_commit_push_run_push \
-        "Push sends local commits that are ahead of the upstream branch." \
-        "The remote branch includes your commits"
+        "Send local commits that are ahead of the upstream branch." \
+        "The remote branch includes your commits."
     then
         lesson_explain_offline "git push"
         ui_info "Your local commit is safe"
