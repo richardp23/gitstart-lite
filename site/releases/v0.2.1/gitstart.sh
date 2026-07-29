@@ -12,7 +12,7 @@ set -o pipefail
 # Application constants. Do not put mutable state in this module.
 
 GS_APP_NAME="GitStart Lite"
-GS_APP_VERSION="0.2.0"
+GS_APP_VERSION="0.2.1"
 GS_APP_ID="gitstart-lite"
 
 # Teaching limits

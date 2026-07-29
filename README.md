@@ -43,7 +43,7 @@ The bootstrap script downloads a versioned release, verifies SHA-256 when a chec
 
 ## Download the release
 
-Download `releases/v0.2.0/gitstart.sh` and `gitstart.sh.sha256` from the site. Verify the checksum. Then run:
+Download `releases/v0.2.1/gitstart.sh` and `gitstart.sh.sha256` from the site. Verify the checksum. Then run:
 
 ```bash
 bash gitstart.sh

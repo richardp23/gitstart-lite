@@ -1,0 +1,29 @@
+# Git Commit Message Rules
+When generating Git commit messages, you must strictly follow the Conventional Commits specification (v1.0.0). Analyze the staged changes and format the message as follows:
+
+## Structural Format
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+
+## Rules for Type
+Choose exactly one valid type from this list based on the nature of the changes:
+- `feat`: A new feature for the user, not a new feature for an internal script.
+- `fix`: A bug fix for the user, not a fix to a build script.
+- `docs`: Changes to the documentation.
+- `style`: Formatting, missing semi-colons, etc; no production code change.
+- `refactor`: Refactoring production code, eg. renaming a variable.
+- `test`: Adding missing tests, refactoring tests; no production code change.
+- `chore`: Updating build tasks, package manager configs, etc; no production code change.
+- `perf`: A code change that improves performance.
+- `ci`: Changes to CI configuration files and scripts.
+
+## Rules for Content
+- **Imperative Mood**: Use the imperative, present tense in the description (e.g., "add" not "added", "change" not "changes").
+- **No Capitalization**: Do not capitalize the first letter of the description.
+- **No Period**: Do not end the description line with a period.
+- **Scope**: Use a brief noun describing a section of the codebase surrounded by parentheses if the change is isolated (e.g., `feat(auth):`).
+- **Breaking Changes**: Append a `!` after the type/scope for breaking changes, and describe it in the footer starting with `BREAKING CHANGE:`.
+- **Length**: Keep the description line under 50 characters. Wrap body lines at 72 characters.

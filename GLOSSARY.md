@@ -1,6 +1,6 @@
 # GitStart Lite Glossary
 
-Version: 0.2.0
+Version: 0.2.1
 Date: 2026-07-29
 
 This glossary defines approved terms for GitStart Lite. Text uses ASD-STE100 principles. This document is not a formal STE certification.

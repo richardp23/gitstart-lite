@@ -12,8 +12,14 @@ download_file() {
     local url="$1"
     local dest="$2"
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL "${url}" -o "${dest}"
-        return $?
+        if curl -fsSL "${url}" -o "${dest}"; then
+            return 0
+        fi
+        # Git for Windows curl may fail revocation checks on some networks.
+        if curl -fsSL --ssl-no-revoke "${url}" -o "${dest}" 2>/dev/null; then
+            return 0
+        fi
+        return 1
     fi
     if command -v wget >/dev/null 2>&1; then
         wget -q -O "${dest}" "${url}"
@@ -25,7 +31,7 @@ download_file() {
 
 read_stable_version() {
     local raw
-    if ! raw="$(download_file "${STABLE_FILE}" - 2>/dev/null)"; then
+    if ! raw="$(curl -fsSL "${STABLE_FILE}" 2>/dev/null || curl -fsSL --ssl-no-revoke "${STABLE_FILE}" 2>/dev/null)"; then
         printf 'v0.1.0\n'
         return 0
     fi
@@ -79,6 +85,7 @@ printf '[INFO] Source: %s\n' "${APP_URL}"
 if ! download_file "${APP_URL}" "${GS_TMP_APP}"; then
     printf '[ERROR] Download failed.\n' >&2
     printf 'Check the network connection and BASE_URL setting.\n' >&2
+    printf 'On Windows Git Bash, retry the launch with curl --ssl-no-revoke.\n' >&2
     printf 'Code: GS-BOOT-002\n' >&2
     exit 1
 fi
