@@ -3,7 +3,6 @@
 
 GS_GIT_LAST_STATUS=0
 GS_GIT_LAST_STDOUT=""
-GS_GIT_LAST_STDERR=""
 
 # Return 0 when git is available.
 git_is_available() {
@@ -15,7 +14,6 @@ git_is_available() {
 git_run_readonly() {
     GS_GIT_LAST_STATUS=0
     GS_GIT_LAST_STDOUT=""
-    GS_GIT_LAST_STDERR=""
     if ! git_is_available; then
         GS_GIT_LAST_STATUS=127
         return 127
@@ -30,7 +28,6 @@ git_capture() {
     local out
     local status
     GS_GIT_LAST_STDOUT=""
-    GS_GIT_LAST_STDERR=""
     if ! git_is_available; then
         GS_GIT_LAST_STATUS=127
         return 127
@@ -56,7 +53,6 @@ git_run_change() {
     local crlf_count
     GS_GIT_LAST_STATUS=0
     GS_GIT_LAST_STDOUT=""
-    GS_GIT_LAST_STDERR=""
     if ! git_is_available; then
         GS_GIT_LAST_STATUS=127
         return 127

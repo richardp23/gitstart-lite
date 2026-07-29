@@ -88,7 +88,9 @@ picker_enumerate() {
 
     picker_clear_lists
     picker_append "${GS_PICKER_DIR}" ".  (use this folder)" "select"
-    parent="$(cd -- "${GS_PICKER_DIR}/.." && pwd 2>/dev/null || dirname -- "${GS_PICKER_DIR}")"
+    if ! parent="$(cd -- "${GS_PICKER_DIR}/.." && pwd 2>/dev/null)"; then
+        parent="$(dirname -- "${GS_PICKER_DIR}")"
+    fi
     picker_append "${parent}" ".. (go up one folder)" "parent"
 
     tmp_labels=""
@@ -183,7 +185,7 @@ EOF
 # Short preview for one directory. Limit entries for readable frames.
 picker_preview() {
     local dir="$1"
-    local limit="${2:-8}"
+    local limit="${2:-$GS_LIMIT_PREVIEW_ENTRIES}"
     local count=0
     local path
     local name
@@ -196,12 +198,13 @@ picker_preview() {
     safety_scan_secrets "${dir}"
     safety_scan_generated "${dir}"
     if [ -n "${GS_SAFE_SECRET_HITS}" ]; then
-        ui_warning "[SECRET?] Likely secret file names are present."
+        ui_warning "[SECRET?] Likely secret file names are present. Code: ${GS_CODE_SAFE_SECRET}"
     fi
     if [ -n "${GS_SAFE_GENERATED_HITS}" ]; then
         ui_warning "[GENERATED] Generated directories are present."
     fi
-    if safety_is_dangerous_directory "${dir}"; then
+    safety_is_dangerous_directory "${dir}" || true
+    if [ "${GS_SAFE_DANGEROUS}" = "1" ]; then
         ui_warning "[WIDE] ${GS_SAFE_DANGEROUS_REASON}"
     fi
 
@@ -235,8 +238,6 @@ picker_render() {
     local i=0
     local label
     local kind
-    local path
-    local marker
     local hint
 
     picker_clear_frame
@@ -258,7 +259,6 @@ picker_render() {
     done
 
     kind="$(picker_nth "${GS_PICKER_KINDS}" "${GS_PICKER_INDEX}")"
-    path="$(picker_nth "${GS_PICKER_PATHS}" "${GS_PICKER_INDEX}")"
     case "${kind}" in
         select) hint="Enter: use this folder" ;;
         parent) hint="Enter: go up" ;;
@@ -266,7 +266,13 @@ picker_render() {
         *) hint="Enter: continue" ;;
     esac
     ui_blank
-    ui_muted "${hint}   ?=help  q=quit"
+    if [ "${GS_TERM_WIDTH}" -ge "${GS_LIMIT_WIDE_COLS}" ] 2>/dev/null; then
+        ui_muted "${hint}   arrows  /=search  .=hidden  m=path  ?=help  q=quit"
+    elif [ "${GS_TERM_WIDTH}" -lt "${GS_LIMIT_NARROW_COLS}" ] 2>/dev/null; then
+        ui_muted "${hint}"
+    else
+        ui_muted "${hint}   ?=help  q=quit"
+    fi
 }
 
 # Manual path entry.
@@ -488,8 +494,10 @@ picker_confirm_and_teach_cd() {
     if [ -n "${warn_bits}" ]; then
         ui_warning "Note: ${warn_bits} found. You will review .gitignore next."
     fi
-    if safety_is_dangerous_directory "${dir}"; then
+    safety_is_dangerous_directory "${dir}" || true
+    if [ "${GS_SAFE_DANGEROUS}" = "1" ]; then
         ui_warning "${GS_SAFE_DANGEROUS_REASON}"
+        ui_muted "Code: ${GS_CODE_PATH_DANGEROUS}"
         if ! input_confirm "Use this folder anyway?"; then
             return 1
         fi

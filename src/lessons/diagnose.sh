@@ -15,7 +15,7 @@ lesson_diagnose() {
     local remote_line
     local sanitized
 
-    lesson_begin "Diagnose a Git problem" 1
+    lesson_begin "Diagnose a Git problem" 1 "${GS_LESSON_DIAGNOSE}"
 
     if ! picker_run; then
         # Diagnosis can still run in the current directory.

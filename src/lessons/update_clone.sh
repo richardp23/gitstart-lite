@@ -10,7 +10,7 @@ lesson_update_run_ff() {
 }
 
 lesson_update_clone() {
-    lesson_begin "Update an existing clone" 4
+    lesson_begin "Update an existing clone" 4 "${GS_LESSON_UPDATE}"
 
     if ! picker_run; then
         return 1

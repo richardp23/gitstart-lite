@@ -129,6 +129,11 @@ ui_fail_detail() {
 
 # Show ASCII or Unicode startup art. Skip in plain mode on a narrow terminal.
 ui_show_banner() {
+    if [ "${GS_TERM_ANIMATION}" != "1" ]; then
+        ui_title "${GS_APP_NAME} ${GS_APP_VERSION}"
+        ui_muted "id: ${GS_APP_ID}"
+        return 0
+    fi
     if [ "${GS_TERM_PLAIN}" = "1" ] && [ "${GS_TERM_WIDTH}" -lt 50 ] 2>/dev/null; then
         ui_title "${GS_APP_NAME} ${GS_APP_VERSION}"
         return 0
@@ -149,14 +154,14 @@ EOF
   ------------
 EOF
     fi
-    ui_muted "Version ${GS_APP_VERSION}"
+    ui_muted "Version ${GS_APP_VERSION} (${GS_APP_ID})"
     ui_muted "Learn Git with real commands."
     ui_blank
 }
 
 ui_show_help_text() {
     cat <<EOF
-${GS_APP_NAME} ${GS_APP_VERSION}
+${GS_APP_NAME} ${GS_APP_VERSION} (${GS_APP_ID})
 
 Usage:
   bash gitstart.sh [options]

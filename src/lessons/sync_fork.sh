@@ -25,7 +25,7 @@ lesson_fork_run_push_origin() {
 }
 
 lesson_sync_fork() {
-    lesson_begin "Synchronize a fork" 6
+    lesson_begin "Synchronize a fork" 6 "${GS_LESSON_FORK}"
 
     if ! picker_run; then
         return 1

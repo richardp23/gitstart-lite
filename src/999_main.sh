@@ -66,7 +66,7 @@ main_parse_args() {
                 shift
                 ;;
             --version)
-                printf '%s %s\n' "${GS_APP_NAME}" "${GS_APP_VERSION}"
+                printf '%s %s (%s)\n' "${GS_APP_NAME}" "${GS_APP_VERSION}" "${GS_APP_ID}"
                 exit 0
                 ;;
             --help|-h)
@@ -106,6 +106,14 @@ main_menu() {
             6)
                 ui_info "Goodbye."
                 return 0
+                ;;
+            *)
+                ui_fail_detail \
+                    "Unexpected menu choice." \
+                    "Main menu" \
+                    "The choice was not recognized." \
+                    "Select a listed number." \
+                    "${GS_CODE_INTERNAL}"
                 ;;
         esac
     done

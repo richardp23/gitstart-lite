@@ -71,11 +71,14 @@ GS_LESSON_PENDING_EMAIL=""
 GS_LESSON_PENDING_SCOPE=""
 
 lesson_initialize_apply_pending_identity() {
+    local scope
     if [ -n "${GS_LESSON_PENDING_NAME}" ]; then
-        git_cmd_config_set "user.name" "${GS_LESSON_PENDING_NAME}" "local" || return 1
-        git_cmd_config_set "user.email" "${GS_LESSON_PENDING_EMAIL}" "local" || return 1
+        scope="${GS_LESSON_PENDING_SCOPE:-local}"
+        git_cmd_config_set "user.name" "${GS_LESSON_PENDING_NAME}" "${scope}" || return 1
+        git_cmd_config_set "user.email" "${GS_LESSON_PENDING_EMAIL}" "${scope}" || return 1
         GS_LESSON_PENDING_NAME=""
         GS_LESSON_PENDING_EMAIL=""
+        GS_LESSON_PENDING_SCOPE=""
         ui_success "Local Git author configuration was saved"
     fi
     return 0
@@ -131,7 +134,7 @@ lesson_initialize_repository() {
     local list_cmd
     local commit_display
 
-    lesson_begin "Publish a directory as a new repository" 11
+    lesson_begin "Publish a directory as a new repository" 11 "${GS_LESSON_INIT}"
 
     GS_LESSON_PENDING_NAME=""
     GS_LESSON_PENDING_EMAIL=""

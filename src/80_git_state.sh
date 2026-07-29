@@ -98,8 +98,12 @@ git_state_inspect() {
     fi
     if [ -n "${remotes}" ]; then
         GS_STATE_REMOTE_COUNT="$(printf '%s\n' "${remotes}" | grep -c '.' || true)"
-        printf '%s\n' "${remotes}" | grep -qx 'origin' && GS_STATE_HAS_ORIGIN=1 || true
-        printf '%s\n' "${remotes}" | grep -qx 'upstream' && GS_STATE_HAS_UPSTREAM_REMOTE=1 || true
+        if printf '%s\n' "${remotes}" | grep -qx 'origin'; then
+            GS_STATE_HAS_ORIGIN=1
+        fi
+        if printf '%s\n' "${remotes}" | grep -qx 'upstream'; then
+            GS_STATE_HAS_UPSTREAM_REMOTE=1
+        fi
     fi
 
     if [ "${GS_STATE_HAS_COMMIT}" = "1" ] && [ "${GS_STATE_REMOTE_COUNT}" = "0" ]; then

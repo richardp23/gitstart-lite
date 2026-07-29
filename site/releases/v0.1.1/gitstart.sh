@@ -12,7 +12,7 @@ set -o pipefail
 # Application constants. Do not put mutable state in this module.
 
 GS_APP_NAME="GitStart Lite"
-GS_APP_VERSION="0.1.0"
+GS_APP_VERSION="0.1.1"
 GS_APP_ID="gitstart-lite"
 
 # Teaching limits
@@ -29,7 +29,10 @@ GS_LESSON_FORK="sync_fork"
 GS_LESSON_DIAGNOSE="diagnose"
 
 # Diagnostic code groups (stable IDs)
+# Bootstrap codes are emitted by site/run; keep them in this catalog.
+# shellcheck disable=SC2034
 GS_CODE_BOOT_CHECKSUM="GS-BOOT-001"
+# shellcheck disable=SC2034
 GS_CODE_BOOT_DOWNLOAD="GS-BOOT-002"
 GS_CODE_TERM_INPUT="GS-TERM-001"
 GS_CODE_PATH_INVALID="GS-PATH-001"
@@ -42,6 +45,8 @@ GS_CODE_AUTH_REQUIRED="GS-AUTH-001"
 GS_CODE_SAFE_STOP="GS-SAFE-001"
 GS_CODE_SAFE_SECRET="GS-SAFE-002"
 GS_CODE_SAFE_DIVERGED="GS-SAFE-003"
+# Reserved when histories cannot merge safely (MVP stops before auto-merge).
+# shellcheck disable=SC2034
 GS_CODE_SAFE_UNRELATED="GS-SAFE-004"
 GS_CODE_LESSON_CMD="GS-LESSON-001"
 GS_CODE_INTERNAL="GS-INTERNAL-001"
@@ -347,6 +352,11 @@ ui_fail_detail() {
 
 # Show ASCII or Unicode startup art. Skip in plain mode on a narrow terminal.
 ui_show_banner() {
+    if [ "${GS_TERM_ANIMATION}" != "1" ]; then
+        ui_title "${GS_APP_NAME} ${GS_APP_VERSION}"
+        ui_muted "id: ${GS_APP_ID}"
+        return 0
+    fi
     if [ "${GS_TERM_PLAIN}" = "1" ] && [ "${GS_TERM_WIDTH}" -lt 50 ] 2>/dev/null; then
         ui_title "${GS_APP_NAME} ${GS_APP_VERSION}"
         return 0
@@ -367,14 +377,14 @@ EOF
   ------------
 EOF
     fi
-    ui_muted "Version ${GS_APP_VERSION}"
+    ui_muted "Version ${GS_APP_VERSION} (${GS_APP_ID})"
     ui_muted "Learn Git with real commands."
     ui_blank
 }
 
 ui_show_help_text() {
     cat <<EOF
-${GS_APP_NAME} ${GS_APP_VERSION}
+${GS_APP_NAME} ${GS_APP_VERSION} (${GS_APP_ID})
 
 Usage:
   bash gitstart.sh [options]
@@ -415,6 +425,8 @@ input_drain_tty() {
         if ! IFS= read -r -n 1 -t 0 junk 2>/dev/null; then
             break
         fi
+        # Byte was discarded; silence unused-variable lint.
+        : "${junk}"
         n=$((n + 1))
     done
     input_restore_tty
@@ -439,6 +451,7 @@ input_read_line() {
     fi
     if ! IFS= read -r GS_INPUT_LAST </dev/tty 2>/dev/null; then
         if ! IFS= read -r GS_INPUT_LAST; then
+            ui_muted "Code: ${GS_CODE_TERM_INPUT}"
             return 1
         fi
     fi
@@ -752,7 +765,9 @@ picker_enumerate() {
 
     picker_clear_lists
     picker_append "${GS_PICKER_DIR}" ".  (use this folder)" "select"
-    parent="$(cd -- "${GS_PICKER_DIR}/.." && pwd 2>/dev/null || dirname -- "${GS_PICKER_DIR}")"
+    if ! parent="$(cd -- "${GS_PICKER_DIR}/.." && pwd 2>/dev/null)"; then
+        parent="$(dirname -- "${GS_PICKER_DIR}")"
+    fi
     picker_append "${parent}" ".. (go up one folder)" "parent"
 
     tmp_labels=""
@@ -847,7 +862,7 @@ EOF
 # Short preview for one directory. Limit entries for readable frames.
 picker_preview() {
     local dir="$1"
-    local limit="${2:-8}"
+    local limit="${2:-$GS_LIMIT_PREVIEW_ENTRIES}"
     local count=0
     local path
     local name
@@ -860,12 +875,13 @@ picker_preview() {
     safety_scan_secrets "${dir}"
     safety_scan_generated "${dir}"
     if [ -n "${GS_SAFE_SECRET_HITS}" ]; then
-        ui_warning "[SECRET?] Likely secret file names are present."
+        ui_warning "[SECRET?] Likely secret file names are present. Code: ${GS_CODE_SAFE_SECRET}"
     fi
     if [ -n "${GS_SAFE_GENERATED_HITS}" ]; then
         ui_warning "[GENERATED] Generated directories are present."
     fi
-    if safety_is_dangerous_directory "${dir}"; then
+    safety_is_dangerous_directory "${dir}" || true
+    if [ "${GS_SAFE_DANGEROUS}" = "1" ]; then
         ui_warning "[WIDE] ${GS_SAFE_DANGEROUS_REASON}"
     fi
 
@@ -899,8 +915,6 @@ picker_render() {
     local i=0
     local label
     local kind
-    local path
-    local marker
     local hint
 
     picker_clear_frame
@@ -922,7 +936,6 @@ picker_render() {
     done
 
     kind="$(picker_nth "${GS_PICKER_KINDS}" "${GS_PICKER_INDEX}")"
-    path="$(picker_nth "${GS_PICKER_PATHS}" "${GS_PICKER_INDEX}")"
     case "${kind}" in
         select) hint="Enter: use this folder" ;;
         parent) hint="Enter: go up" ;;
@@ -930,7 +943,13 @@ picker_render() {
         *) hint="Enter: continue" ;;
     esac
     ui_blank
-    ui_muted "${hint}   ?=help  q=quit"
+    if [ "${GS_TERM_WIDTH}" -ge "${GS_LIMIT_WIDE_COLS}" ] 2>/dev/null; then
+        ui_muted "${hint}   arrows  /=search  .=hidden  m=path  ?=help  q=quit"
+    elif [ "${GS_TERM_WIDTH}" -lt "${GS_LIMIT_NARROW_COLS}" ] 2>/dev/null; then
+        ui_muted "${hint}"
+    else
+        ui_muted "${hint}   ?=help  q=quit"
+    fi
 }
 
 # Manual path entry.
@@ -1152,8 +1171,10 @@ picker_confirm_and_teach_cd() {
     if [ -n "${warn_bits}" ]; then
         ui_warning "Note: ${warn_bits} found. You will review .gitignore next."
     fi
-    if safety_is_dangerous_directory "${dir}"; then
+    safety_is_dangerous_directory "${dir}" || true
+    if [ "${GS_SAFE_DANGEROUS}" = "1" ]; then
         ui_warning "${GS_SAFE_DANGEROUS_REASON}"
+        ui_muted "Code: ${GS_CODE_PATH_DANGEROUS}"
         if ! input_confirm "Use this folder anyway?"; then
             return 1
         fi
@@ -1244,7 +1265,6 @@ picker_run() {
 
 GS_GIT_LAST_STATUS=0
 GS_GIT_LAST_STDOUT=""
-GS_GIT_LAST_STDERR=""
 
 # Return 0 when git is available.
 git_is_available() {
@@ -1256,7 +1276,6 @@ git_is_available() {
 git_run_readonly() {
     GS_GIT_LAST_STATUS=0
     GS_GIT_LAST_STDOUT=""
-    GS_GIT_LAST_STDERR=""
     if ! git_is_available; then
         GS_GIT_LAST_STATUS=127
         return 127
@@ -1271,7 +1290,6 @@ git_capture() {
     local out
     local status
     GS_GIT_LAST_STDOUT=""
-    GS_GIT_LAST_STDERR=""
     if ! git_is_available; then
         GS_GIT_LAST_STATUS=127
         return 127
@@ -1297,7 +1315,6 @@ git_run_change() {
     local crlf_count
     GS_GIT_LAST_STATUS=0
     GS_GIT_LAST_STDOUT=""
-    GS_GIT_LAST_STDERR=""
     if ! git_is_available; then
         GS_GIT_LAST_STATUS=127
         return 127
@@ -1563,8 +1580,12 @@ git_state_inspect() {
     fi
     if [ -n "${remotes}" ]; then
         GS_STATE_REMOTE_COUNT="$(printf '%s\n' "${remotes}" | grep -c '.' || true)"
-        printf '%s\n' "${remotes}" | grep -qx 'origin' && GS_STATE_HAS_ORIGIN=1 || true
-        printf '%s\n' "${remotes}" | grep -qx 'upstream' && GS_STATE_HAS_UPSTREAM_REMOTE=1 || true
+        if printf '%s\n' "${remotes}" | grep -qx 'origin'; then
+            GS_STATE_HAS_ORIGIN=1
+        fi
+        if printf '%s\n' "${remotes}" | grep -qx 'upstream'; then
+            GS_STATE_HAS_UPSTREAM_REMOTE=1
+        fi
     fi
 
     if [ "${GS_STATE_HAS_COMMIT}" = "1" ] && [ "${GS_STATE_REMOTE_COUNT}" = "0" ]; then
@@ -1870,6 +1891,7 @@ safety_stop() {
 
 GS_LESSON_MODE="${GS_MODE_LEARN}"
 GS_LESSON_NAME=""
+GS_LESSON_ID=""
 GS_LESSON_STEP=0
 GS_LESSON_TOTAL=0
 GS_LESSON_DONE=""
@@ -1879,7 +1901,9 @@ GS_LESSON_BOARD=1
 lesson_begin() {
     local name="$1"
     local total="${2:-0}"
+    local id="${3:-}"
     GS_LESSON_NAME="${name}"
+    GS_LESSON_ID="${id}"
     GS_LESSON_STEP=0
     GS_LESSON_TOTAL="${total}"
     GS_LESSON_DONE=""
@@ -2096,7 +2120,11 @@ lesson_stop_safe() {
     local reason="$2"
     local next_action="$3"
     local code="${4:-$GS_CODE_SAFE_STOP}"
-    ui_fail_detail "${title}" "${GS_LESSON_NAME}" "${reason}" "${next_action}" "${code}"
+    local operation="${GS_LESSON_NAME}"
+    if [ -n "${GS_LESSON_ID}" ]; then
+        operation="${GS_LESSON_NAME} (${GS_LESSON_ID})"
+    fi
+    ui_fail_detail "${title}" "${operation}" "${reason}" "${next_action}" "${code}"
     return 1
 }
 
@@ -2114,6 +2142,7 @@ ${GS_LESSON_CURRENT}"
     GS_LESSON_STEP="${GS_LESSON_TOTAL}"
     lesson_draw_board
     ui_complete "Finished: ${GS_LESSON_NAME}"
+    : "${GS_LESSON_ID}"
     ui_next "Return to the main menu, or choose Diagnose."
 }
 
@@ -2140,6 +2169,8 @@ lesson_cd_display_path() {
                 return 0
                 ;;
             "${home}"/*)
+                # Literal tilde for display. Do not expand as $HOME.
+                # shellcheck disable=SC2088
                 printf '~/%s\n' "${dir#"${home}"/}"
                 return 0
                 ;;
@@ -2153,15 +2184,20 @@ lesson_expand_user_path() {
     local path="$1"
     local home="${HOME:-}"
     local prefix
+    local rest
 
     # Do not write ${path#~/}. Bash expands ~/ in that pattern.
+    # Literal '~/' is intentional display/input syntax (SC2088).
+    # shellcheck disable=SC2088
     prefix='~/'
+    # shellcheck disable=SC2088
     case "${path}" in
         '~')
             printf '%s\n' "${home}"
             ;;
         '~/'*)
-            printf '%s/%s\n' "${home}" "${path#"${prefix}"}"
+            rest="${path#"${prefix}"}"
+            printf '%s/%s\n' "${home}" "${rest}"
             ;;
         *)
             printf '%s\n' "${path}"
@@ -2364,11 +2400,14 @@ GS_LESSON_PENDING_EMAIL=""
 GS_LESSON_PENDING_SCOPE=""
 
 lesson_initialize_apply_pending_identity() {
+    local scope
     if [ -n "${GS_LESSON_PENDING_NAME}" ]; then
-        git_cmd_config_set "user.name" "${GS_LESSON_PENDING_NAME}" "local" || return 1
-        git_cmd_config_set "user.email" "${GS_LESSON_PENDING_EMAIL}" "local" || return 1
+        scope="${GS_LESSON_PENDING_SCOPE:-local}"
+        git_cmd_config_set "user.name" "${GS_LESSON_PENDING_NAME}" "${scope}" || return 1
+        git_cmd_config_set "user.email" "${GS_LESSON_PENDING_EMAIL}" "${scope}" || return 1
         GS_LESSON_PENDING_NAME=""
         GS_LESSON_PENDING_EMAIL=""
+        GS_LESSON_PENDING_SCOPE=""
         ui_success "Local Git author configuration was saved"
     fi
     return 0
@@ -2424,7 +2463,7 @@ lesson_initialize_repository() {
     local list_cmd
     local commit_display
 
-    lesson_begin "Publish a directory as a new repository" 11
+    lesson_begin "Publish a directory as a new repository" 11 "${GS_LESSON_INIT}"
 
     GS_LESSON_PENDING_NAME=""
     GS_LESSON_PENDING_EMAIL=""
@@ -2664,7 +2703,7 @@ lesson_commit_push_run_push() {
 lesson_commit_push() {
     local commit_display
 
-    lesson_begin "Save and push changes" 6
+    lesson_begin "Save and push changes" 6 "${GS_LESSON_COMMIT_PUSH}"
 
     if ! picker_run; then
         return 1
@@ -2828,6 +2867,7 @@ lesson_commit_push() {
     then
         lesson_explain_offline "git push"
         ui_info "Your local commit is safe"
+        ui_muted "If Git asked for a password or token, use your credential helper. Code: ${GS_CODE_AUTH_REQUIRED}"
         return 1
     fi
 
@@ -2854,7 +2894,7 @@ lesson_update_run_ff() {
 }
 
 lesson_update_clone() {
-    lesson_begin "Update an existing clone" 4
+    lesson_begin "Update an existing clone" 4 "${GS_LESSON_UPDATE}"
 
     if ! picker_run; then
         return 1
@@ -3006,7 +3046,7 @@ lesson_fork_run_push_origin() {
 }
 
 lesson_sync_fork() {
-    lesson_begin "Synchronize a fork" 6
+    lesson_begin "Synchronize a fork" 6 "${GS_LESSON_FORK}"
 
     if ! picker_run; then
         return 1
@@ -3160,7 +3200,7 @@ lesson_diagnose() {
     local remote_line
     local sanitized
 
-    lesson_begin "Diagnose a Git problem" 1
+    lesson_begin "Diagnose a Git problem" 1 "${GS_LESSON_DIAGNOSE}"
 
     if ! picker_run; then
         # Diagnosis can still run in the current directory.
@@ -3291,7 +3331,7 @@ main_parse_args() {
                 shift
                 ;;
             --version)
-                printf '%s %s\n' "${GS_APP_NAME}" "${GS_APP_VERSION}"
+                printf '%s %s (%s)\n' "${GS_APP_NAME}" "${GS_APP_VERSION}" "${GS_APP_ID}"
                 exit 0
                 ;;
             --help|-h)
@@ -3331,6 +3371,14 @@ main_menu() {
             6)
                 ui_info "Goodbye."
                 return 0
+                ;;
+            *)
+                ui_fail_detail \
+                    "Unexpected menu choice." \
+                    "Main menu" \
+                    "The choice was not recognized." \
+                    "Select a listed number." \
+                    "${GS_CODE_INTERNAL}"
                 ;;
         esac
     done

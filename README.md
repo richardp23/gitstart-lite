@@ -35,17 +35,15 @@ Useful options:
 
 ## Launch online
 
-Replace the placeholder domain before you publish:
-
 ```bash
-bash -c "$(curl -fsSL https://ACCOUNT.github.io/PROJECT/run)"
+bash -c "$(curl -fsSL https://richardp23.github.io/gitstart-lite/run)"
 ```
 
 The bootstrap script downloads a versioned release, verifies SHA-256 when a checksum tool exists, and starts GitStart.
 
 ## Download the release
 
-Download `releases/v0.1.0/gitstart.sh` and `gitstart.sh.sha256` from the site. Verify the checksum. Then run:
+Download `releases/v0.1.1/gitstart.sh` and `gitstart.sh.sha256` from the site. Verify the checksum. Then run:
 
 ```bash
 bash gitstart.sh

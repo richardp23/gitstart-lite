@@ -6,6 +6,7 @@
 
 GS_LESSON_MODE="${GS_MODE_LEARN}"
 GS_LESSON_NAME=""
+GS_LESSON_ID=""
 GS_LESSON_STEP=0
 GS_LESSON_TOTAL=0
 GS_LESSON_DONE=""
@@ -15,7 +16,9 @@ GS_LESSON_BOARD=1
 lesson_begin() {
     local name="$1"
     local total="${2:-0}"
+    local id="${3:-}"
     GS_LESSON_NAME="${name}"
+    GS_LESSON_ID="${id}"
     GS_LESSON_STEP=0
     GS_LESSON_TOTAL="${total}"
     GS_LESSON_DONE=""
@@ -232,7 +235,11 @@ lesson_stop_safe() {
     local reason="$2"
     local next_action="$3"
     local code="${4:-$GS_CODE_SAFE_STOP}"
-    ui_fail_detail "${title}" "${GS_LESSON_NAME}" "${reason}" "${next_action}" "${code}"
+    local operation="${GS_LESSON_NAME}"
+    if [ -n "${GS_LESSON_ID}" ]; then
+        operation="${GS_LESSON_NAME} (${GS_LESSON_ID})"
+    fi
+    ui_fail_detail "${title}" "${operation}" "${reason}" "${next_action}" "${code}"
     return 1
 }
 
@@ -250,6 +257,7 @@ ${GS_LESSON_CURRENT}"
     GS_LESSON_STEP="${GS_LESSON_TOTAL}"
     lesson_draw_board
     ui_complete "Finished: ${GS_LESSON_NAME}"
+    : "${GS_LESSON_ID}"
     ui_next "Return to the main menu, or choose Diagnose."
 }
 
@@ -276,6 +284,8 @@ lesson_cd_display_path() {
                 return 0
                 ;;
             "${home}"/*)
+                # Literal tilde for display. Do not expand as $HOME.
+                # shellcheck disable=SC2088
                 printf '~/%s\n' "${dir#"${home}"/}"
                 return 0
                 ;;
@@ -289,15 +299,20 @@ lesson_expand_user_path() {
     local path="$1"
     local home="${HOME:-}"
     local prefix
+    local rest
 
     # Do not write ${path#~/}. Bash expands ~/ in that pattern.
+    # Literal '~/' is intentional display/input syntax (SC2088).
+    # shellcheck disable=SC2088
     prefix='~/'
+    # shellcheck disable=SC2088
     case "${path}" in
         '~')
             printf '%s\n' "${home}"
             ;;
         '~/'*)
-            printf '%s/%s\n' "${home}" "${path#"${prefix}"}"
+            rest="${path#"${prefix}"}"
+            printf '%s/%s\n' "${home}" "${rest}"
             ;;
         *)
             printf '%s\n' "${path}"

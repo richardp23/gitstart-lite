@@ -28,7 +28,7 @@ lesson_commit_push_run_push() {
 lesson_commit_push() {
     local commit_display
 
-    lesson_begin "Save and push changes" 6
+    lesson_begin "Save and push changes" 6 "${GS_LESSON_COMMIT_PUSH}"
 
     if ! picker_run; then
         return 1
@@ -192,6 +192,7 @@ lesson_commit_push() {
     then
         lesson_explain_offline "git push"
         ui_info "Your local commit is safe"
+        ui_muted "If Git asked for a password or token, use your credential helper. Code: ${GS_CODE_AUTH_REQUIRED}"
         return 1
     fi
 

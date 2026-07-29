@@ -75,7 +75,10 @@ else
 fi
 
 if command -v shellcheck >/dev/null 2>&1; then
-    shellcheck -s bash "${OUT}" || printf 'ShellCheck reported issues.\n' >&2
+    if ! shellcheck -s bash "${OUT}"; then
+        printf 'ShellCheck reported issues.\n' >&2
+        exit 1
+    fi
 else
     printf 'ShellCheck not installed. Skipped.\n'
 fi

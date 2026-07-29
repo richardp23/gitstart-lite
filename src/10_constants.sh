@@ -1,7 +1,7 @@
 # Application constants. Do not put mutable state in this module.
 
 GS_APP_NAME="GitStart Lite"
-GS_APP_VERSION="0.1.0"
+GS_APP_VERSION="0.1.1"
 GS_APP_ID="gitstart-lite"
 
 # Teaching limits
@@ -18,7 +18,10 @@ GS_LESSON_FORK="sync_fork"
 GS_LESSON_DIAGNOSE="diagnose"
 
 # Diagnostic code groups (stable IDs)
+# Bootstrap codes are emitted by site/run; keep them in this catalog.
+# shellcheck disable=SC2034
 GS_CODE_BOOT_CHECKSUM="GS-BOOT-001"
+# shellcheck disable=SC2034
 GS_CODE_BOOT_DOWNLOAD="GS-BOOT-002"
 GS_CODE_TERM_INPUT="GS-TERM-001"
 GS_CODE_PATH_INVALID="GS-PATH-001"
@@ -31,6 +34,8 @@ GS_CODE_AUTH_REQUIRED="GS-AUTH-001"
 GS_CODE_SAFE_STOP="GS-SAFE-001"
 GS_CODE_SAFE_SECRET="GS-SAFE-002"
 GS_CODE_SAFE_DIVERGED="GS-SAFE-003"
+# Reserved when histories cannot merge safely (MVP stops before auto-merge).
+# shellcheck disable=SC2034
 GS_CODE_SAFE_UNRELATED="GS-SAFE-004"
 GS_CODE_LESSON_CMD="GS-LESSON-001"
 GS_CODE_INTERNAL="GS-INTERNAL-001"

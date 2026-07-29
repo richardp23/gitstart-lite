@@ -15,8 +15,8 @@
   <p>GitStart runs on your machine with Bash and Git. Use these steps when you prefer a direct download instead of the one-line bootstrap.</p>
 
   <h2>Download the release</h2>
-  <pre>curl -fsSL -O https://ACCOUNT.github.io/PROJECT/releases/v0.1.0/gitstart.sh
-curl -fsSL -O https://ACCOUNT.github.io/PROJECT/releases/v0.1.0/gitstart.sh.sha256</pre>
+  <pre>curl -fsSL -O https://richardp23.github.io/gitstart-lite/releases/v0.1.1/gitstart.sh
+curl -fsSL -O https://richardp23.github.io/gitstart-lite/releases/v0.1.1/gitstart.sh.sha256</pre>
 
   <h2>Verify the checksum</h2>
   <pre>sha256sum -c gitstart.sh.sha256</pre>
@@ -28,7 +28,7 @@ curl -fsSL -O https://ACCOUNT.github.io/PROJECT/releases/v0.1.0/gitstart.sh.sha2
   <p>Optional flags: <code>--help</code>, <code>--version</code>, <code>--plain</code>, <code>--no-color</code>.</p>
 
   <h2>Build from source</h2>
-  <pre>git clone YOUR_REPO_URL
+  <pre>git clone https://github.com/richardp23/gitstart-lite.git
 cd gitstart-lite
 bash build.sh
 bash dist/gitstart.sh --help</pre>

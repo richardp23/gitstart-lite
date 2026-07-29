@@ -19,6 +19,8 @@ input_drain_tty() {
         if ! IFS= read -r -n 1 -t 0 junk 2>/dev/null; then
             break
         fi
+        # Byte was discarded; silence unused-variable lint.
+        : "${junk}"
         n=$((n + 1))
     done
     input_restore_tty
@@ -43,6 +45,7 @@ input_read_line() {
     fi
     if ! IFS= read -r GS_INPUT_LAST </dev/tty 2>/dev/null; then
         if ! IFS= read -r GS_INPUT_LAST; then
+            ui_muted "Code: ${GS_CODE_TERM_INPUT}"
             return 1
         fi
     fi
