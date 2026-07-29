@@ -1,7 +1,7 @@
 # GitStart Software Requirements Specification
 
 Document ID: GS-SRS-001  
-Version: 0.1.1
+Version: 0.2.0
 Status: Draft for implementation  
 Date: 2026-07-28  
 Primary audience: Project owner, developers, testers, and instructors
@@ -294,6 +294,8 @@ The word `shall` identifies a mandatory requirement.
 3. update an existing clone.
 4. synchronize a fork.
 5. diagnose a Git problem.
+
+The menu shall show a short purpose line under each lesson choice so the student can tell local-to-remote work from remote-to-local work and fork sync.
 
 ### 8.5 Directory selection
 

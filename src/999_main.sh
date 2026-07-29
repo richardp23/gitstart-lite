@@ -89,10 +89,15 @@ main_menu() {
         ui_blank
         ui_title "Main menu"
         ui_print "1) Publish an existing directory as a new repository"
+        ui_muted "    New folder: start Git, make the first commit, and push it."
         ui_print "2) Save and push changes in an existing repository"
+        ui_muted "    You edited files: commit them and send them to the remote."
         ui_print "3) Update an existing clone"
+        ui_muted "    The remote moved ahead: bring those commits into your local copy."
         ui_print "4) Synchronize a fork"
+        ui_muted "    Fork workflow: fetch from the original repo, then push to your fork."
         ui_print "5) Diagnose a Git problem"
+        ui_muted "    Inspect the repository and get a safe next action."
         ui_print "6) Quit"
         ui_blank
         input_choice 6 "Select a number: " || return 1
