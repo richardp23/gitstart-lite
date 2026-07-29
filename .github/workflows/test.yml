@@ -1,0 +1,53 @@
+# Run syntax checks and automated tests.
+# ShellCheck is optional when available on the runner.
+
+name: test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Build release file
+        run: bash build.sh
+
+      - name: Syntax check
+        run: bash -n dist/gitstart.sh
+
+      - name: Run automated tests
+        run: bash tests/run_tests.sh
+
+      - name: Run ShellCheck when available
+        run: |
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck -s bash dist/gitstart.sh
+          else
+            echo "ShellCheck not installed on this runner. Skipped."
+          fi
+
+      - name: Upload release artifacts
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitstart-dist
+          path: |
+            dist/gitstart.sh
+            dist/gitstart.sh.sha256

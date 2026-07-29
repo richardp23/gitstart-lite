@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GitStart Lite — Troubleshooting</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 2rem auto; line-height: 1.5; padding: 0 1rem; }
+    code, pre { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 0.2rem; }
+    pre { padding: 0.75rem; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Troubleshooting</h1>
+  <p>Use these steps for common GitStart Lite problems.</p>
+
+  <h2>Git is missing</h2>
+  <p>GitStart needs Git on your PATH.</p>
+  <pre>git --version</pre>
+  <p>Install Git from your platform package manager or from <a href="https://git-scm.com/">git-scm.com</a>.</p>
+  <p>On Windows, use Git Bash or ensure Git is in your shell PATH.</p>
+
+  <h2>Bootstrap download failed</h2>
+  <p>Check your network connection. Confirm the site URL is correct before you publish.</p>
+  <p>You can download the release file and run it directly. See <a href="offline.html">download and run</a>.</p>
+
+  <h2>Checksum verification failed</h2>
+  <p>Do not run a file when the checksum does not match.</p>
+  <p>Download the release file and the <code>gitstart.sh.sha256</code> file again from the same version.</p>
+  <pre>sha256sum -c gitstart.sh.sha256</pre>
+  <p>On macOS:</p>
+  <pre>shasum -a 256 -c gitstart.sh.sha256</pre>
+
+  <h2>No checksum tool</h2>
+  <p>The bootstrap warns when SHA-256 is not available. You can confirm to continue or stop.</p>
+  <p>Install a checksum tool, or download the release and verify the checksum on another machine.</p>
+
+  <h2>Download and run</h2>
+  <p>Download <code>releases/v0.1.0/gitstart.sh</code> and <code>gitstart.sh.sha256</code>. Verify the checksum. Then run:</p>
+  <pre>bash gitstart.sh</pre>
+  <p>See <a href="offline.html">download and run</a> for full steps.</p>
+
+  <h2>Network required for remote steps</h2>
+  <p>Fetch, pull, and push need network access to the remote host.</p>
+  <p>When a remote step fails, GitStart names the step and keeps your local repository unchanged.</p>
+
+  <p><a href="../index.html">Back to launch page</a></p>
+</body>
+</html>

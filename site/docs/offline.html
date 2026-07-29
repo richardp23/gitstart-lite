@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GitStart Lite — Download and run</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 2rem auto; line-height: 1.5; padding: 0 1rem; }
+    code, pre { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 0.2rem; }
+    pre { padding: 0.75rem; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Download and run</h1>
+  <p>GitStart runs on your machine with Bash and Git. Use these steps when you prefer a direct download instead of the one-line bootstrap.</p>
+
+  <h2>Download the release</h2>
+  <pre>curl -fsSL -O https://ACCOUNT.github.io/PROJECT/releases/v0.1.0/gitstart.sh
+curl -fsSL -O https://ACCOUNT.github.io/PROJECT/releases/v0.1.0/gitstart.sh.sha256</pre>
+
+  <h2>Verify the checksum</h2>
+  <pre>sha256sum -c gitstart.sh.sha256</pre>
+  <p>On macOS you can use <code>shasum -a 256 -c gitstart.sh.sha256</code>.</p>
+  <p>If no checksum tool is available, review the file source before you run it.</p>
+
+  <h2>Run GitStart</h2>
+  <pre>bash gitstart.sh</pre>
+  <p>Optional flags: <code>--help</code>, <code>--version</code>, <code>--plain</code>, <code>--no-color</code>.</p>
+
+  <h2>Build from source</h2>
+  <pre>git clone YOUR_REPO_URL
+cd gitstart-lite
+bash build.sh
+bash dist/gitstart.sh --help</pre>
+
+  <p>GitStart does not send telemetry. See <a href="privacy.html">privacy</a>.</p>
+
+  <p><a href="../index.html">Back to launch page</a></p>
+</body>
+</html>

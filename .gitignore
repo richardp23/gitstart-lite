@@ -1,0 +1,16 @@
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+
+# Generated
+node_modules/
+.venv/
+venv/
+__pycache__/
+dist/
+build/
+.next/
+target/

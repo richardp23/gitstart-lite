@@ -1,0 +1,60 @@
+# Build the release, copy site files, and deploy GitHub Pages.
+# Do not deploy when required tests fail.
+
+name: pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Pages artifact
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Build and test
+        run: |
+          bash build.sh
+          bash -n dist/gitstart.sh
+          bash tests/run_tests.sh
+          shellcheck -s bash dist/gitstart.sh
+
+      - name: Prepare site release files
+        run: |
+          VERSION="$(sed -n 's/^GS_APP_VERSION="\(.*\)"/\1/p' src/10_constants.sh)"
+          mkdir -p "site/releases/v${VERSION}"
+          cp dist/gitstart.sh "site/releases/v${VERSION}/"
+          cp dist/gitstart.sh.sha256 "site/releases/v${VERSION}/"
+          printf 'v%s\n' "${VERSION}" > site/stable.txt
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
