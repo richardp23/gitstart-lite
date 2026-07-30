@@ -1,7 +1,7 @@
 # GitStart Software Requirements Specification
 
 Document ID: GS-SRS-001  
-Version: 0.3.1
+Version: 0.4.0
 Status: Draft for implementation  
 Date: 2026-07-28  
 Primary audience: Project owner, developers, testers, and instructors
@@ -409,7 +409,7 @@ Examples include the file-system root, the user home directory, and a top-level 
 
 **FR-129** The application shall not assume that the branch name is `main`.
 
-**FR-130** The application shall check the global Git user name and email before the first commit.
+**FR-130** The application shall check the effective Git author identity (user name and email) in the selected repository before the first commit. The application shall prefer local repository configuration. A local identity from another directory shall not satisfy the selected repository.
 
 ### 8.9 Secret and generated-file checks
 
@@ -598,6 +598,8 @@ The first list shall include:
 **FR-285** The application shall preserve the local repository state after a network failure.
 
 **FR-286** The application shall let the user restart and continue from the detected state.
+
+**FR-287** The application shall classify a failed remote Git operation conservatively. Supported categories include NETWORK, TLS, AUTHENTICATION, PERMISSION, REMOTE_NOT_FOUND, NON_FAST_FORWARD, DIVERGED, and UNKNOWN. The application shall not describe every remote failure as an offline condition. When evidence is weak, the application shall use UNKNOWN.
 
 ### 8.16 Safety controls
 

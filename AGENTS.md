@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Version: 0.3.1
+Version: 0.4.0
 Date: 2026-07-28
 
 This file is the agent tracking and architecture guide for GitStart Lite.
@@ -268,11 +268,12 @@ Each error needs: failed operation, known reason, safety status, one safe next a
 ## 6. Directory picker design
 
 - Collect only immediate child directories.
-- Store paths and labels in parallel indexed arrays.
+- Store paths, labels, kinds, and search values in parallel indexed arrays.
 - Search labels; select stored paths.
-- Preview limits: 20 entries, depth 1.
+- Sort complete records. Do not sort labels and then re-search paths.
+- Preview limits: about 6 entries, depth 1. Cache preview for the highlight.
 - Indicators: `[GIT]`, `[SECRET?]`, `[GENERATED]`, `[WIDE]`.
-- Layouts: wide (≥100), normal (70–99), narrow (<70).
+- Layouts: wide (≥100), normal (70–99), narrow (<70). Narrow hides preview until `p`.
 
 Keys when single-key input works:
 
@@ -283,6 +284,7 @@ Left/Backspace  Parent
 /           Local search
 .           Toggle hidden
 m           Manual path
+p           Preview (narrow toggle; refresh on wider layouts)
 ?           Help
 Esc         Back or cancel
 q           Quit from top-level
@@ -334,7 +336,7 @@ Bootstrap (`site/run`) shall:
 Do not edit `dist/gitstart.sh` by hand when it is generated. Change source modules and rebuild.
 
 Version bumps follow D-016. Release folders use `v` plus
-`GS_APP_VERSION` (for example `site/releases/v0.3.1/`).
+`GS_APP_VERSION` (for example `site/releases/v0.4.0/`).
 
 ---
 
@@ -434,6 +436,32 @@ When you bump the version, also update:
 
 `make release-site` and the Pages workflow read `GS_APP_VERSION`.
 Do not change the stable pointer before the versioned artifact exists.
+
+### D-017 Manual interactive TTY release checks
+
+Automated tests may stub input. They do not replace real TTY checks.
+
+Before a classroom release, run the checks in `tests/manual/README.md`
+on current Git Bash (Windows) and on macOS system Bash 3.2 when
+available.
+
+Do not add `expect`, `tmux`, or another PTY package only to automate
+those checks. Optional tools may enhance tests only when already
+present and must skip cleanly when absent.
+
+Screen redraws (D-011) and mandatory pauses (D-013) stay intentional
+in Lite. Do not replace the lesson board with an append-only log.
+
+### D-018 Lite static site and full-product boundary
+
+GitStart Lite keeps one small static public site under `site/`.
+
+Do not add a website framework, JavaScript application, analytics,
+remote fonts, images, or a new site build system for Lite.
+
+A future full GitStart product may use Go, a larger TUI, a GUI, an
+integrated terminal, and a larger website. Do not add those features
+to Lite.
 
 ---
 
