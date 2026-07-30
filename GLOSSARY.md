@@ -1,7 +1,7 @@
 # GitStart Lite Glossary
 
-Version: 0.4.0
-Date: 2026-07-29
+Version: 0.5.0
+Date: 2026-07-30
 
 This glossary defines approved terms for GitStart Lite. Text uses ASD-STE100 principles. This document is not a formal STE certification.
 
@@ -109,5 +109,8 @@ The remote branch that a local branch follows. GitStart checks this relationship
 
 ## W
 
-**Working tree**  
+**Working directory**
+The folder that terminal commands use. GitStart records the launch working directory as `GS_SESSION_START_DIR`. `pwd` prints it. `cd` changes it inside the GitStart process.
+
+**Working tree**
 The files that the user can edit in a local repository. GitStart classifies the working tree as clean or changed.

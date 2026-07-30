@@ -19,6 +19,8 @@ lesson_diagnose() {
 
     ui_info "Diagnosis collects safe local facts about this repository."
     ui_muted "It does not read secret file contents. It does not send data automatically."
+    ui_muted "Use the report to see branch, remotes, and ahead or behind counts."
+    ui_muted "Diagnosis does not change your repository."
 
     if ! picker_run; then
         # Diagnosis can still run in the current directory.
@@ -27,6 +29,7 @@ lesson_diagnose() {
 
     lesson_step_begin "Collect local Git facts"
     ui_info "GitStart inspects branch, remotes, and ahead or behind counts."
+    ui_muted "Ahead means local commits not on the remote. Behind means remote commits you do not have."
     git_state_inspect
 
     report=""

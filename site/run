@@ -164,10 +164,18 @@ boot_print_download_help() {
 read_stable_version() {
     local raw
     if ! raw="$(boot_download "${STABLE_FILE}" "-")"; then
-        printf 'v0.1.0\n'
-        return 0
+        printf '[ERROR] Could not download stable.txt.\n' >&2
+        printf 'URL: %s\n' "${STABLE_FILE}" >&2
+        printf 'See %s/docs/troubleshooting.html\n' "${BASE_URL}" >&2
+        return 1
     fi
     raw="$(printf '%s' "${raw}" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    if [ -z "${raw}" ]; then
+        printf '[ERROR] stable.txt was empty.\n' >&2
+        printf 'URL: %s\n' "${STABLE_FILE}" >&2
+        printf 'See %s/docs/troubleshooting.html\n' "${BASE_URL}" >&2
+        return 1
+    fi
     case "${raw}" in
         v*) printf '%s\n' "${raw}" ;;
         *) printf 'v%s\n' "${raw}" ;;
@@ -199,7 +207,9 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM HUP
 
-VERSION="$(read_stable_version)"
+if ! VERSION="$(read_stable_version)"; then
+    exit 1
+fi
 VERSION="${VERSION#v}"
 APP_URL="${BASE_URL}/releases/v${VERSION}/gitstart.sh"
 SUM_URL="${BASE_URL}/releases/v${VERSION}/gitstart.sh.sha256"

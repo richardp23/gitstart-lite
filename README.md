@@ -32,7 +32,7 @@ If the one-line launch fails on Windows Git Bash with a certificate
 revocation error, see
 [`site/docs/troubleshooting.html`](site/docs/troubleshooting.html).
 
-Download `releases/v0.4.0/gitstart.sh` and `gitstart.sh.sha256` from the
+Download `releases/v0.5.0/gitstart.sh` and `gitstart.sh.sha256` from the
 site. Verify the checksum. Then run:
 
 ```bash

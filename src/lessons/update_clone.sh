@@ -64,7 +64,11 @@ lesson_update_clone() {
     fi
 
     lesson_step_begin "Fetch remote updates"
-    ui_info "Fetch downloads new commits from the remote without changing your files."
+    ui_info "Fetch downloads new commits from the remote without changing your project files."
+    ui_muted "Fetch updates remote-tracking information. It does not merge into your branch."
+    GS_TEACH_GOAL="Download remote commits so you can compare your branch with the remote."
+    GS_TEACH_CONCEPT="fetch downloads remote information. It does not change your project files. It does not upload local commits."
+    GS_TEACH_LOOK_FOR="Remote tracking branches are updated."
     if ! lesson_teach_exact_command \
         "git fetch" \
         lesson_update_run_fetch \
@@ -115,7 +119,11 @@ lesson_update_clone() {
 
     lesson_step_begin "Apply a fast-forward-only update"
     ui_info "Fast-forward means: move your branch pointer forward to match the remote."
+    ui_muted "This updates your current branch. It is not the same as fetch alone."
     ui_muted "GitStart uses --ff-only so it will stop instead of creating a merge conflict."
+    GS_TEACH_GOAL="Update your local branch only when the remote is a straight continuation of your history."
+    GS_TEACH_CONCEPT="pull --ff-only updates the current branch from its upstream. It stops instead of creating a merge conflict."
+    GS_TEACH_LOOK_FOR="Your local branch matches the upstream branch."
     if ! lesson_teach_exact_command \
         "git pull --ff-only" \
         lesson_update_run_ff \

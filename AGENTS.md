@@ -1,7 +1,7 @@
 # AGENTS.md
 
-Version: 0.4.0
-Date: 2026-07-28
+Version: 0.5.0
+Date: 2026-07-30
 
 This file is the agent tracking and architecture guide for GitStart Lite.
 
@@ -223,11 +223,13 @@ Prefixes:
 
 ```text
 GS_APP_       Application metadata
+GS_SESSION_   Session paths recorded at startup
 GS_TERM_      Terminal state
 GS_UI_        User-interface state
 GS_PICKER_    Picker state
 GS_STATE_     Git state
 GS_LESSON_    Lesson state
+GS_TEACH_     Current command teaching fields
 GS_TMP_       Temporary paths
 ```
 
@@ -336,7 +338,7 @@ Bootstrap (`site/run`) shall:
 Do not edit `dist/gitstart.sh` by hand when it is generated. Change source modules and rebuild.
 
 Version bumps follow D-016. Release folders use `v` plus
-`GS_APP_VERSION` (for example `site/releases/v0.4.0/`).
+`GS_APP_VERSION` (for example `site/releases/v0.5.0/`).
 
 ---
 
@@ -462,6 +464,37 @@ remote fonts, images, or a new site build system for Lite.
 A future full GitStart product may use Go, a larger TUI, a GUI, an
 integrated terminal, and a larger website. Do not add those features
 to Lite.
+
+### D-019 Conditional `cd` teaching after folder selection
+
+The directory picker selects the project folder.
+
+Keep two directory concepts separate:
+
+1. `GS_SESSION_START_DIR` — resolved once at startup and immutable. Use it
+   only for the child-shell completion explanation.
+2. The current application working directory — resolve with `pwd -P` when the
+   picker selection is confirmed. Compare it with the resolved selected
+   directory to decide whether `cd` is required.
+
+`cd` is a conditional teaching substep:
+
+1. Record the resolved launch directory at startup (`GS_SESSION_START_DIR`).
+2. After selection, resolve the current application directory and the selected
+   directory.
+3. Teach `cd` only when the selected folder differs from the current
+   application folder. Do not decide from `GS_SESSION_START_DIR` alone.
+4. When the folders match, explain that GitStart is already in the correct
+   folder and that `cd` is not necessary. Do not create a fake command step.
+5. When the folders differ, teach a safe displayed `cd` command. A predefined
+   runner performs `cd --` to the selected path. Do not execute student text.
+6. After `cd`, verify that `pwd -P` equals the resolved selected directory.
+7. At completion, compare the selected directory with `GS_SESSION_START_DIR`
+   only. When they differ, explain the child-shell limitation and show a safe
+   return `cd` command.
+
+Do not duplicate this decision in lesson source comments beyond a short
+reference to D-019.
 
 ---
 

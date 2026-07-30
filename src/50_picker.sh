@@ -26,6 +26,8 @@ GS_PICKER_PREVIEW_PATH=""
 GS_PICKER_PREVIEW_TEXT=""
 GS_PICKER_PREVIEW_FORCE=0
 GS_PICKER_SHOW_PREVIEW_NARROW=0
+# Rebuild directory records only when navigation or filters change.
+GS_PICKER_RECORDS_DIRTY=1
 
 # Clear picker lists.
 picker_clear_lists() {
@@ -34,6 +36,20 @@ picker_clear_lists() {
     GS_PICKER_KINDS=()
     GS_PICKER_SEARCH=()
     GS_PICKER_COUNT=0
+}
+
+# Mark records and preview for refresh on the next ensure call.
+picker_records_mark_dirty() {
+    GS_PICKER_RECORDS_DIRTY=1
+    picker_preview_invalidate
+}
+
+# Enumerate only when records are dirty (Up/Down must not rebuild).
+picker_records_ensure() {
+    if [ "${GS_PICKER_RECORDS_DIRTY}" = "1" ]; then
+        picker_enumerate
+        GS_PICKER_RECORDS_DIRTY=0
+    fi
 }
 
 # Invalidate cached preview text.
@@ -345,7 +361,7 @@ picker_manual_path() {
     GS_PICKER_DIR="${path}"
     GS_PICKER_INDEX=0
     GS_PICKER_FILTER=""
-    picker_preview_invalidate
+    picker_records_mark_dirty
     return 0
 }
 
@@ -358,7 +374,7 @@ picker_numbered() {
     local i
 
     while true; do
-        picker_enumerate
+        picker_records_ensure
         ui_blank
         ui_title "Choose a project folder"
         ui_info "You are here: ${GS_PICKER_DIR}"
@@ -381,7 +397,7 @@ picker_numbered() {
             s|S)
                 input_text "Search text: " 1 || true
                 GS_PICKER_FILTER="$(input_trim "${GS_INPUT_LAST}")"
-                picker_preview_invalidate
+                picker_records_mark_dirty
                 continue
                 ;;
             h|H)
@@ -390,7 +406,7 @@ picker_numbered() {
                 else
                     GS_PICKER_SHOW_HIDDEN=1
                 fi
-                picker_preview_invalidate
+                picker_records_mark_dirty
                 continue
                 ;;
             m|M)
@@ -420,7 +436,7 @@ picker_numbered() {
             parent)
                 GS_PICKER_DIR="$(cd -- "${GS_PICKER_DIR}/.." && pwd)"
                 GS_PICKER_INDEX=0
-                picker_preview_invalidate
+                picker_records_mark_dirty
                 continue
                 ;;
             dir)
@@ -428,7 +444,7 @@ picker_numbered() {
                     GS_PICKER_DIR="$(cd -- "${path}" && pwd)"
                     GS_PICKER_INDEX=0
                     GS_PICKER_FILTER=""
-                    picker_preview_invalidate
+                    picker_records_mark_dirty
                 fi
                 continue
                 ;;
@@ -444,7 +460,7 @@ picker_interactive() {
     local kind
 
     while true; do
-        picker_enumerate
+        picker_records_ensure
         picker_render
         if ! input_read_key; then
             picker_drain_tty
@@ -466,7 +482,7 @@ picker_interactive() {
                 GS_PICKER_DIR="$(cd -- "${GS_PICKER_DIR}/.." && pwd)"
                 GS_PICKER_INDEX=0
                 GS_PICKER_FILTER=""
-                picker_preview_invalidate
+                picker_records_mark_dirty
                 ;;
             enter)
                 path="${GS_PICKER_PATHS[GS_PICKER_INDEX]}"
@@ -482,14 +498,14 @@ picker_interactive() {
                         GS_PICKER_DIR="$(cd -- "${GS_PICKER_DIR}/.." && pwd)"
                         GS_PICKER_INDEX=0
                         GS_PICKER_FILTER=""
-                        picker_preview_invalidate
+                        picker_records_mark_dirty
                         ;;
                     dir)
                         if [ -d "${path}" ]; then
                             GS_PICKER_DIR="$(cd -- "${path}" && pwd)"
                             GS_PICKER_INDEX=0
                             GS_PICKER_FILTER=""
-                            picker_preview_invalidate
+                            picker_records_mark_dirty
                         fi
                         ;;
                 esac
@@ -499,7 +515,7 @@ picker_interactive() {
                 input_text "Search: " 1 || true
                 GS_PICKER_FILTER="$(input_trim "${GS_INPUT_LAST}")"
                 GS_PICKER_INDEX=0
-                picker_preview_invalidate
+                picker_records_mark_dirty
                 ;;
             .)
                 if [ "${GS_PICKER_SHOW_HIDDEN}" = "1" ]; then
@@ -508,7 +524,7 @@ picker_interactive() {
                     GS_PICKER_SHOW_HIDDEN=1
                 fi
                 GS_PICKER_INDEX=0
-                picker_preview_invalidate
+                picker_records_mark_dirty
                 ;;
             p|P)
                 if [ "${GS_TERM_WIDTH}" -lt "${GS_LIMIT_NARROW_COLS}" ] 2>/dev/null; then
@@ -540,17 +556,22 @@ picker_interactive() {
     done
 }
 
-# Confirm selection, warn briefly, teach cd.
+# Confirm selection. Teach cd only when selected differs from current cwd (D-019, FR-087).
 picker_confirm_and_teach_cd() {
     local dir="$1"
     local cd_cmd
-    local cd_path
     local warn_bits=""
+    local current_dir
+    local selected_dir
+    local same_dir=0
 
     input_drain_tty
     if [ -n "${GS_LESSON_NAME}" ]; then
-        # Same lesson-board step as the picker. New screen, same [NOW] label.
-        lesson_focus "Choose project folder"
+        if [ "${GS_LESSON_USE_STAGES}" = "1" ]; then
+            lesson_substep_begin "Confirm the project folder"
+        else
+            lesson_focus "Choose project folder"
+        fi
     else
         ui_step "Confirm folder"
     fi
@@ -585,47 +606,119 @@ picker_confirm_and_teach_cd() {
         return 1
     fi
 
-    # Teach the home-relative form students usually type.
-    cd_path="$(lesson_cd_display_path "${dir}")"
-    case "${cd_path}" in
-        -*)
-            cd_cmd="cd -- $(printf '%q' "${cd_path}")"
-            ;;
-        *)
-            cd_cmd="cd ${cd_path}"
-            ;;
-    esac
-
-    if [ -n "${GS_LESSON_NAME}" ]; then
-        lesson_focus "Open the folder"
-    else
-        ui_step "Open the folder"
-    fi
-    if ! lesson_teach_exact_command \
-        "${cd_cmd}" \
-        picker_noop_cd \
-        "cd moves your shell into the project folder." \
-        "This folder becomes your working directory." \
-        lesson_match_cd_command
-    then
-        return 1
-    fi
-    if ! cd -- "${dir}"; then
+    # Decide cd from current application directory, not session start (D-019).
+    current_dir="$(lesson_current_dir_resolved)"
+    if ! selected_dir="$(lesson_path_resolve "${dir}")"; then
         ui_fail_detail \
-            "Could not open the directory." \
+            "Could not resolve the selected directory." \
             "cd" \
-            "The directory is not accessible." \
+            "The selected path is not an accessible directory." \
             "Select a different directory." \
             "${GS_CODE_PATH_INVALID}"
         return 1
     fi
-    ui_success "Using: $(pwd)"
-    GS_PICKER_SELECTED="$(pwd)"
+    if [ "${selected_dir}" = "${current_dir}" ]; then
+        same_dir=1
+    fi
+
+    if [ "${same_dir}" = "1" ]; then
+        if [ -n "${GS_LESSON_NAME}" ]; then
+            if [ "${GS_LESSON_USE_STAGES}" = "1" ]; then
+                lesson_substep_begin "Working directory is already correct"
+            else
+                lesson_focus "Working directory is already correct"
+            fi
+        else
+            ui_step "Working directory is already correct"
+        fi
+        ui_info "GitStart is already in the correct location."
+        ui_info "You do not need to use cd."
+        GS_PICKER_SELECTED="${selected_dir}"
+        ui_success "Using: ${GS_PICKER_SELECTED}"
+        return 0
+    fi
+
+    if ! cd_cmd="$(lesson_format_cd_command "${selected_dir}")"; then
+        ui_fail_detail \
+            "Could not build a safe cd command." \
+            "cd" \
+            "The selected path contains unsupported characters." \
+            "Select a different directory." \
+            "${GS_CODE_PATH_INVALID}"
+        return 1
+    fi
+
+    if [ -n "${GS_LESSON_NAME}" ]; then
+        if [ "${GS_LESSON_USE_STAGES}" = "1" ]; then
+            lesson_substep_begin "Change to the project folder"
+        else
+            lesson_focus "Change to the project folder"
+        fi
+    else
+        ui_step "Change to the project folder"
+    fi
+
+    ui_info "Current folder:"
+    ui_print "${current_dir}"
+    ui_info "Selected folder:"
+    ui_print "${selected_dir}"
+
+    GS_PICKER_SELECTED="${selected_dir}"
+    GS_TEACH_GOAL="Move the terminal working directory to your project folder."
+    GS_TEACH_CONCEPT="cd means change directory. A directory is a folder. Later commands use this folder. cd does not move your project files."
+    GS_TEACH_LOOK_FOR="After the command, the working directory is the selected project folder."
+    GS_TEACH_HELP_FN="picker_help_cd"
+
+    if ! lesson_teach_exact_command \
+        "${cd_cmd}" \
+        picker_run_cd \
+        "cd changes the working directory to the selected project folder." \
+        "The working directory becomes the selected folder."
+    then
+        return 1
+    fi
+
+    current_dir="$(lesson_current_dir_resolved)"
+    if [ "${current_dir}" != "${selected_dir}" ]; then
+        ui_fail_detail \
+            "The working directory did not match the selected folder." \
+            "cd" \
+            "GitStart could not verify the directory change." \
+            "Select the folder again." \
+            "${GS_CODE_PATH_INVALID}"
+        return 1
+    fi
+    GS_PICKER_SELECTED="${current_dir}"
+    ui_success "Using: ${GS_PICKER_SELECTED}"
     return 0
 }
 
-picker_noop_cd() {
-    return 0
+# Predefined safe cd runner (FR-105, FR-107, D-019).
+picker_run_cd() {
+    cd -- "${GS_PICKER_SELECTED}" || return 1
+}
+
+picker_help_cd() {
+    local expected="$1"
+    ui_print "GOAL"
+    ui_muted "Open the project folder so later Git commands use it."
+    ui_blank
+    ui_print "BEFORE"
+    ui_muted "Your terminal is in a different folder from the project."
+    ui_blank
+    ui_print "COMMAND PARTS"
+    ui_command "${expected}"
+    ui_muted "cd means change directory."
+    ui_muted "-- stops option parsing so a folder name that starts with - is safe."
+    ui_muted "The path names the destination folder."
+    ui_blank
+    ui_print "AFTER"
+    ui_muted "The working directory is the selected project folder."
+    ui_muted "cd does not copy or move project files."
+    ui_blank
+    ui_print "COMMON MISTAKES"
+    ui_muted "Do not omit quotes or escapes shown in the command."
+    ui_muted "Do not type a different folder path."
 }
 
 # Main picker entry. Sets GS_PICKER_SELECTED on success.
@@ -636,10 +729,14 @@ picker_run() {
     GS_PICKER_FILTER=""
     GS_PICKER_INDEX=0
     GS_PICKER_SHOW_PREVIEW_NARROW=0
-    picker_preview_invalidate
+    picker_records_mark_dirty
 
     if [ -n "${GS_LESSON_NAME}" ]; then
-        lesson_focus "Choose project folder"
+        if [ "${GS_LESSON_USE_STAGES}" = "1" ]; then
+            lesson_substep_begin "Choose project folder"
+        else
+            lesson_focus "Choose project folder"
+        fi
     else
         ui_step "Choose project folder"
     fi

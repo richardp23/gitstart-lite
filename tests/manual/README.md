@@ -36,8 +36,10 @@ bash dist/gitstart.sh
 | MT-004 | Yes/no confirm | FR-053, FR-111 | `y` and `n` work in Assisted mode |
 | MT-005 | Numbered menu | FR-075 | With `--plain`, directory selection works by number |
 | MT-006 | Extra Enter | D-009 | After a typed command, an early Enter does not hang; pause still advances |
-| MT-007 | Mandatory pause | D-013 | Before a finished stage leaves the board, Enter is required |
+| MT-007 | Mandatory pause | D-013 | Before a finished conceptual stage leaves the board, Enter is required |
 | MT-008 | Screen redraw | D-011 | Lesson board redraws on focus change without stacking clutter |
+| MT-009 | Detailed help | FR-110 | `?` opens detailed help and returns to the same unfinished command |
+| MT-009b | Conditional cd | FR-087, D-019 | Skip cd when selected equals current cwd. Teach cd when selected differs from current cwd |
 
 ## Directory picker
 

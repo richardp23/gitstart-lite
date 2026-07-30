@@ -22,7 +22,12 @@ TESTS=(
     tests/unit/test_input_drain.sh
     tests/unit/test_bootstrap.sh
     tests/unit/test_git_remote_error.sh
+    tests/unit/test_git_network.sh
+    tests/unit/test_cd_format.sh
+    tests/unit/test_conditional_cd.sh
     tests/unit/test_picker.sh
+    tests/unit/test_picker_dirty.sh
+    tests/unit/test_lesson_ui.sh
     tests/integration/test_git_state.sh
     tests/integration/test_git_state_helpers.sh
     tests/integration/test_identity.sh

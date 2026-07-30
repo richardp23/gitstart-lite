@@ -55,7 +55,11 @@ lesson_commit_push() {
     lesson_step_begin "Show the current branch and status"
     ui_info "First look at the current branch and whether files changed."
     ui_info "Current branch: ${GS_STATE_BRANCH:-unknown}"
+    ui_muted "Look for untracked files, modified files, staged files, or a clean working tree."
     git_state_summary
+    GS_TEACH_GOAL="Ask Git whether this folder has changes to save."
+    GS_TEACH_CONCEPT="git status shows the current branch and whether files are untracked, modified, staged, or clean."
+    GS_TEACH_LOOK_FOR="You see staged changes, unstaged changes, or a clean tree."
     if ! lesson_teach_exact_command \
         "git status" \
         lesson_commit_push_run_status \
@@ -86,6 +90,10 @@ lesson_commit_push() {
         lesson_step_begin "Stage changes"
         ui_info "Staging means: choose which changes go into the next commit."
         ui_muted "git add . stages the files in this folder. Names listed in .gitignore stay out."
+        ui_muted "Staging does not create a commit. Staging does not upload files."
+        GS_TEACH_GOAL="Prepare your edited files for a commit."
+        GS_TEACH_CONCEPT="git add stages changes. The dot means the current directory. Staging does not create a commit or upload files."
+        GS_TEACH_LOOK_FOR="Changed files are staged."
         if ! lesson_teach_exact_command \
             "git add ." \
             lesson_commit_push_run_add \
@@ -94,9 +102,11 @@ lesson_commit_push() {
         then
             return 1
         fi
+        lesson_show_staged_paths
 
         lesson_step_begin "Commit changes"
-        ui_info "A commit is a saved snapshot. Write a short message that describes the change."
+        ui_info "A commit is a local saved snapshot. Write a short message that describes the change."
+        ui_muted "Only staged changes enter the commit. A commit does not push automatically."
         ui_muted "Keep the first line short. ${GS_LIMIT_COMMIT_MSG} characters or fewer."
         while true; do
             input_text "Enter a commit message: " || return 1
@@ -112,6 +122,9 @@ lesson_commit_push() {
             break
         done
         commit_display="$(lesson_format_commit_command "${GS_LESSON_CP_COMMIT_MSG}")"
+        GS_TEACH_GOAL="Save your staged changes into Git history."
+        GS_TEACH_CONCEPT="A commit is a local saved snapshot. -m provides the message. A commit does not push automatically."
+        GS_TEACH_LOOK_FOR="A new commit exists on the current branch."
         if ! lesson_teach_exact_command \
             "${commit_display}" \
             lesson_commit_push_run_commit \
@@ -125,7 +138,8 @@ lesson_commit_push() {
     fi
 
     lesson_step_begin "Fetch remote information"
-    ui_info "Fetch downloads remote updates without changing your local files."
+    ui_info "Fetch downloads remote information without changing your project files."
+    ui_muted "Fetch updates remote-tracking data. It does not merge into your branch."
     ui_muted "This helps you check if the remote moved ahead before you push."
     if [ "${GS_STATE_HAS_ORIGIN}" != "1" ]; then
         lesson_stop_safe \
@@ -136,6 +150,9 @@ lesson_commit_push() {
         return 1
     fi
 
+    GS_TEACH_GOAL="Update remote tracking data before you push."
+    GS_TEACH_CONCEPT="fetch downloads remote information. It does not change your project files. It does not upload local commits."
+    GS_TEACH_LOOK_FOR="Remote branch information is current."
     if ! lesson_teach_exact_command \
         "git fetch" \
         lesson_commit_push_run_fetch \
@@ -198,6 +215,10 @@ lesson_commit_push() {
 
     lesson_step_begin "Push local commits"
     ui_info "Push sends your local commits to the remote named origin."
+    ui_muted "Push uploads local commits. It does not download remote commits."
+    GS_TEACH_GOAL="Send local commits that are ahead of the upstream branch."
+    GS_TEACH_CONCEPT="push sends commits to the remote. It does not download remote commits."
+    GS_TEACH_LOOK_FOR="The remote branch includes your commits."
     if ! lesson_teach_exact_command \
         "git push" \
         lesson_commit_push_run_push \

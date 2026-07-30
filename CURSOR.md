@@ -1,7 +1,7 @@
 # Cursor Project Instructions for GitStart
 
-Version: 0.4.0
-Date: 2026-07-28
+Version: 0.5.0
+Date: 2026-07-30
 
 ## 1. Mission
 

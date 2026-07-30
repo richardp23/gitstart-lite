@@ -39,41 +39,32 @@ printf 'v9.9.9\n' >"${SITE}/stable.txt"
 
 # Stub curl: map URLs under file:// or http://localhost-style to SITE files.
 # Logs each attempt as: MODE|ARGS
+# Parse arguments with while/shift. Do not use eval (NFR-080).
 cat >"${BIN}/curl" <<'EOF'
 #!/usr/bin/env bash
 set -u
 log="${GITSTART_TEST_CURL_LOG:-/dev/null}"
 mode="normal"
-args_join=""
 url=""
 dest=""
-out_stdout=0
-i=1
-while [ "${i}" -le "$#" ]; do
-    eval "arg=\${${i}}"
-    case "${arg}" in
+while [ "$#" -gt 0 ]; do
+    case "$1" in
         --ssl-no-revoke) mode="ssl-no-revoke" ;;
         -o)
-            i=$((i + 1))
-            eval "dest=\${${i}}"
-            args_join="${args_join} -o"
+            shift
+            dest="${1:-}"
             ;;
         -fsSL|-f|-s|-S|-L) ;;
         http*|file*)
-            url="${arg}"
+            url="$1"
             ;;
         *)
-            args_join="${args_join} ${arg}"
             ;;
     esac
-    i=$((i + 1))
+    shift
 done
 printf '%s|%s\n' "${mode}" "${url}" >>"${log}"
 
-# Map .../path to SITE root file.
-rel="${url#*://}"
-rel="${rel#*/}"
-# Accept FILE_BASE/path or any host/path ending with known suffixes.
 case "${url}" in
     */stable.txt) src="${GITSTART_TEST_SITE}/stable.txt" ;;
     */gitstart.sh.sha256) src="${GITSTART_TEST_SITE}/releases/v9.9.9/gitstart.sh.sha256" ;;
@@ -89,6 +80,11 @@ if [ "${GITSTART_TEST_CURL_FAIL_NORMAL:-0}" = "1" ] && [ "${mode}" = "normal" ];
 fi
 if [ "${GITSTART_TEST_CURL_FAIL_ALL:-0}" = "1" ]; then
     exit 35
+fi
+if [ "${GITSTART_TEST_CURL_FAIL_STABLE:-0}" = "1" ]; then
+    case "${url}" in
+        */stable.txt) exit 22 ;;
+    esac
 fi
 
 if [ -z "${dest}" ]; then
@@ -236,5 +232,53 @@ if grep -q '^ssl-no-revoke|' "${LOG}"; then
 else
     assert_ok "ssl-no-revoke not used on normal success" true
 fi
+
+# stable.txt failure must not fall back to v0.1.0 (FR-013).
+HELPERS="${TMP}/boot_helpers2.sh"
+awk '
+    /^cleanup[(]/ { exit }
+    { print }
+' "${ROOT}/site/run" >"${HELPERS}"
+# shellcheck disable=SC1090
+. "${HELPERS}"
+export GITSTART_TEST_CURL_FAIL_STABLE=1
+# Fix bootstrap STATUS capture for stable failure test.
+ERR_OUT="$(read_stable_version 2>&1)" && STATUS=0 || STATUS=$?
+if [ "${STATUS}" -eq 0 ]; then
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    TESTS_RUN=$((TESTS_RUN + 1))
+    printf 'FAIL: read_stable_version should fail when stable.txt is missing\n'
+else
+    assert_ok "stable.txt failure returns nonzero" true
+fi
+assert_contains "${ERR_OUT}" "stable.txt" "stable failure names stable.txt"
+case "${ERR_OUT}" in
+    *v0.1.0*)
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+        TESTS_RUN=$((TESTS_RUN + 1))
+        printf 'FAIL: obsolete v0.1.0 fallback still present\n'
+        ;;
+    *)
+        assert_ok "no obsolete v0.1.0 fallback" true
+        ;;
+esac
+export GITSTART_TEST_CURL_FAIL_STABLE=0
+
+# Full bootstrap must not select v0.1.0 when stable.txt fails.
+: >"${LOG}"
+export GITSTART_TEST_CURL_FAIL_STABLE=1
+OUT="$(bash "${ROOT}/site/run" 2>&1)" && STATUS=0 || STATUS=$?
+assert_fail "bootstrap exits nonzero when stable.txt fails" test "${STATUS}" -eq 0
+case "${OUT}" in
+    *v0.1.0*)
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+        TESTS_RUN=$((TESTS_RUN + 1))
+        printf 'FAIL: bootstrap fell back to v0.1.0\n'
+        ;;
+    *)
+        assert_ok "bootstrap does not fall back to v0.1.0" true
+        ;;
+esac
+export GITSTART_TEST_CURL_FAIL_STABLE=0
 
 test_summary

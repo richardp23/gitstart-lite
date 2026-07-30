@@ -1,9 +1,9 @@
 # GitStart Software Requirements Specification
 
 Document ID: GS-SRS-001  
-Version: 0.4.0
+Version: 0.5.0
 Status: Draft for implementation  
-Date: 2026-07-28  
+Date: 2026-07-30
 Primary audience: Project owner, developers, testers, and instructors
 
 ## 1. Purpose
@@ -42,7 +42,8 @@ GitStart shall:
 - run as a local Bash program.
 - let the student select a project directory.
 - show the files in the selected directory.
-- teach the shell command that opens the selected directory.
+- teach `cd` when the selected directory differs from the launch directory.
+- verify the working directory with `pwd`.
 - inspect the Git state of the directory.
 - initialize a new local repository.
 - stage files.
@@ -223,6 +224,8 @@ The word `shall` identifies a mandatory requirement.
 
 **FR-009** The bootstrap shall pass command-line options to the application.
 
+**FR-013** When the bootstrap cannot download or read `stable.txt`, it shall stop with a clear error that names the `stable.txt` URL and a troubleshooting URL. It shall remove its temporary directory. It shall not fall back to an obsolete release version.
+
 **FR-010** The project shall publish the standalone application file for offline use.
 
 **FR-011** The application shall not require a second download after it starts.
@@ -353,9 +356,11 @@ Examples include the file-system root, the user home directory, and a top-level 
 
 **FR-086** The application shall ask the user to confirm the selected directory.
 
-**FR-087** After visual selection, the application shall teach the equivalent `cd` command.
+**FR-087** After visual selection, the application shall teach `cd` only when the selected directory differs from the current application working directory. When the selected directory equals the current application working directory, the application shall explain that `cd` is not necessary and shall continue to directory verification. When `cd` is taught, a predefined safe runner shall change to the selected directory. The application shall not execute the student text as shell code. The session start directory is separate and shall not decide whether `cd` is required.
 
 **FR-088** On Git Bash, the application shall show a Git Bash path when it can convert the selected Windows path safely.
+
+**FR-089** Displayed `cd` commands shall be valid Bash forms. For the home directory use `cd -- ~`. For a path under the home directory preserve an unquoted `~/` prefix and escape the remainder. For a path outside the home directory use an escaped absolute path. The application shall reject paths that contain unsupported control characters.
 
 ### 8.7 Command teaching engine
 
@@ -379,13 +384,23 @@ Examples include the file-system root, the user home directory, and a top-level 
 
 **FR-109** The application shall give a useful correction when a command does not match.
 
-**FR-110** The application shall let the student request the explanation again.
+**FR-110** The application shall let the student open detailed help for the current command or substep. After help, the application shall return to the same unfinished step without running the command and without marking the step complete.
 
 **FR-111** The application shall let the student stop before the command runs.
 
 **FR-112** The application shall show the command result.
 
 **FR-113** The application shall inspect the Git state after a state-changing command.
+
+**FR-114** When teaching data is available, the normal command screen shall use short GOAL, CONCEPT, TYPE, and LOOK FOR sections. Color shall not be the only state indicator. Plain and no-color modes shall remain usable.
+
+**FR-115** The lesson board shall support conceptual stages with current substeps. Completed stages shall remain visible. The board may redraw. A mandatory pause shall apply when leaving a finished conceptual stage.
+
+**FR-116** At application startup, the application shall record the resolved working directory once. That value shall not change during the session. Directory comparisons shall use resolved paths.
+
+**FR-117** Reserved. See FR-089 for safe `cd` command formatting.
+
+**FR-118** When the lesson used a directory other than the session start directory, the completion screen shall explain that the parent terminal returns to the start directory after GitStart closes, and shall show a safe `cd` command for the project folder.
 
 ### 8.8 Git preflight checks
 
@@ -599,7 +614,9 @@ The first list shall include:
 
 **FR-286** The application shall let the user restart and continue from the detected state.
 
-**FR-287** The application shall classify a failed remote Git operation conservatively. Supported categories include NETWORK, TLS, AUTHENTICATION, PERMISSION, REMOTE_NOT_FOUND, NON_FAST_FORWARD, DIVERGED, and UNKNOWN. The application shall not describe every remote failure as an offline condition. When evidence is weak, the application shall use UNKNOWN.
+**FR-287** The application shall classify a failed remote Git operation conservatively. Supported categories include NETWORK, TLS, AUTHENTICATION, PERMISSION, REMOTE_NOT_FOUND, NON_FAST_FORWARD, DIVERGED, and UNKNOWN. The application shall not describe every remote failure as an offline condition. AUTHENTICATION requires strong credential evidence. PERMISSION requires strong access-denial evidence after authentication is plausible. A generic permission-denied message without enough evidence shall be UNKNOWN. When evidence is weak, the application shall use UNKNOWN.
+
+**FR-288** For network Git operations that can request credentials, the Git execution layer shall set `GIT_TERMINAL_PROMPT=0` so an invisible username or password prompt cannot block captured output. When authentication fails, the application shall explain that GitStart does not request passwords or tokens, shall keep local work safe, and shall not retry automatically.
 
 ### 8.16 Safety controls
 

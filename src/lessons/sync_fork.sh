@@ -51,7 +51,11 @@ lesson_sync_fork() {
     ui_info "origin is your fork. You push to origin."
     ui_info "upstream is the original project. You fetch from upstream."
     ui_muted "This lesson updates your local branch from upstream, then pushes to your fork."
+    ui_muted "Fetch downloads remote information. Push uploads local commits."
 
+    GS_TEACH_GOAL="List remotes so you can see which URLs are configured."
+    GS_TEACH_CONCEPT="origin is usually your fork. upstream is usually the original project."
+    GS_TEACH_LOOK_FOR="You see remote names and sanitized URLs."
     if ! lesson_teach_exact_command \
         "git remote -v" \
         lesson_fork_run_remote_v \
@@ -105,7 +109,11 @@ lesson_sync_fork() {
     fi
 
     lesson_step_begin "Fetch from upstream"
-    ui_info "Fetch downloads commits from the original project without changing your files."
+    ui_info "Fetch downloads commits from the original project without changing your project files."
+    ui_muted "Fetch updates remote-tracking branches. It does not merge into your branch yet."
+    GS_TEACH_GOAL="Download new commits from the original repository."
+    GS_TEACH_CONCEPT="fetch downloads remote information. It does not change your project files."
+    GS_TEACH_LOOK_FOR="upstream remote-tracking branches are updated."
     if ! lesson_teach_exact_command \
         "git fetch upstream" \
         lesson_fork_run_fetch_upstream \

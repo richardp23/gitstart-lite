@@ -123,6 +123,52 @@ git_validate_https_url() {
     esac
 }
 
+# Run a Git command that may contact a remote and prompt for credentials.
+# Disables terminal credential prompts so capture cannot hang (FR-288).
+git_run_network() {
+    local status
+    local old_prompt
+    old_prompt="${GIT_TERMINAL_PROMPT-}"
+    export GIT_TERMINAL_PROMPT=0
+    git_run_change "$@"
+    status=$?
+    if [ -n "${old_prompt}" ]; then
+        export GIT_TERMINAL_PROMPT="${old_prompt}"
+    else
+        unset GIT_TERMINAL_PROMPT 2>/dev/null || true
+    fi
+    return "${status}"
+}
+
+# Capture stdout and stderr from a network Git command with prompts disabled.
+git_capture_network() {
+    local out
+    local status
+    local old_prompt
+    old_prompt="${GIT_TERMINAL_PROMPT-}"
+    export GIT_TERMINAL_PROMPT=0
+    GS_GIT_LAST_STDOUT=""
+    if ! git_is_available; then
+        GS_GIT_LAST_STATUS=127
+        if [ -n "${old_prompt}" ]; then
+            export GIT_TERMINAL_PROMPT="${old_prompt}"
+        else
+            unset GIT_TERMINAL_PROMPT 2>/dev/null || true
+        fi
+        return 127
+    fi
+    out="$(git "$@" 2>&1)"
+    status=$?
+    GS_GIT_LAST_STATUS="${status}"
+    GS_GIT_LAST_STDOUT="${out}"
+    if [ -n "${old_prompt}" ]; then
+        export GIT_TERMINAL_PROMPT="${old_prompt}"
+    else
+        unset GIT_TERMINAL_PROMPT 2>/dev/null || true
+    fi
+    return "${status}"
+}
+
 # Predefined safe Git operations used after command validation.
 
 git_cmd_init() {
@@ -163,26 +209,55 @@ git_cmd_remote_verbose() {
 git_cmd_push_upstream() {
     local remote="$1"
     local branch="$2"
-    git_run_change push -u "${remote}" "${branch}"
+    git_run_network push -u "${remote}" "${branch}"
 }
 
 git_cmd_push() {
     local remote="$1"
     local branch="$2"
-    git_run_change push "${remote}" "${branch}"
+    git_run_network push "${remote}" "${branch}"
 }
 
 git_cmd_fetch() {
     local remote="${1:-}"
     if [ -n "${remote}" ]; then
-        git_run_change fetch "${remote}"
+        git_run_network fetch "${remote}"
     else
-        git_run_change fetch
+        git_run_network fetch
     fi
 }
 
 git_cmd_pull_ff_only() {
-    git_run_change pull --ff-only
+    git_run_network pull --ff-only
+}
+
+# Read-only remote reference listing for empty-remote preflight (FR-181).
+# Usage: git_cmd_ls_remote_heads_tags URL
+# Sets GS_GIT_LAST_STDOUT to the listing. Classifies failures via caller.
+git_cmd_ls_remote_heads_tags() {
+    local url="$1"
+    git_capture_network ls-remote --heads --tags "${url}"
+}
+
+# Classify remote reference preflight result.
+# Prints: EMPTY | HAS_REFS | then relies on git_classify_remote_error for failures.
+# Usage after git_cmd_ls_remote_heads_tags: git_classify_ls_remote_result
+git_classify_ls_remote_result() {
+    local status="${GS_GIT_LAST_STATUS:-1}"
+    local out="${GS_GIT_LAST_STDOUT:-}"
+    local class
+
+    if [ "${status}" -eq 0 ] 2>/dev/null; then
+        if [ -z "$(printf '%s' "${out}" | tr -d '[:space:]')" ]; then
+            printf 'EMPTY\n'
+        else
+            printf 'HAS_REFS\n'
+        fi
+        return 0
+    fi
+    class="$(git_classify_remote_error "${status}" "${out}")"
+    printf '%s\n' "${class}"
+    return 0
 }
 
 git_cmd_merge_ff_only() {
@@ -252,33 +327,27 @@ git_classify_remote_error() {
     esac
 
     case "${lower}" in
-        *"repository not found"*|*"repo not found"*)
-            printf 'REMOTE_NOT_FOUND\n'
-            return 0
-            ;;
-    esac
-
-    case "${lower}" in
-        *"write access"*|*"not allowed to push"*|*"protected branch"*|*"permission to"*"denied to push"*)
+        *"write access"*|*"not allowed to push"*|*"protected branch"*|*"push not permitted"*|*"403 forbidden"*|*"http 403"*|*"returned error: 403"*|*"permission to"*"denied to push"*|*"access denied"*"push"*)
             printf 'PERMISSION\n'
             return 0
             ;;
     esac
 
     case "${lower}" in
-        *"authentication failed"*|*"invalid credentials"*|*"could not read username"*|*"terminal prompts disabled"*|*"http basic: access denied"*|*"401 unauthorized"*|*"auth failed"*)
+        *"authentication failed"*|*"invalid credentials"*|*"could not read username"*|*"terminal prompts disabled"*|*"http basic: access denied"*|*"401 unauthorized"*|*"http 401"*|*"returned error: 401"*|*"auth failed"*|*"permission denied (publickey)"*)
             printf 'AUTHENTICATION\n'
             return 0
             ;;
     esac
 
     case "${lower}" in
-        *"permission denied (publickey)"*|*"permission denied"*|*"403 forbidden"*|*"access denied"*)
-            printf 'AUTHENTICATION\n'
+        *"repository not found"*|*"repo not found"*|*"not found or is not accessible"*)
+            printf 'REMOTE_NOT_FOUND\n'
             return 0
             ;;
     esac
 
+    # Generic "permission denied" without publickey or stronger evidence stays UNKNOWN.
     case "${lower}" in
         *"ssl certificate"*|*"tls"*|*"schannel"*|*"revocation"*|*"certificate verify failed"*|*"ssl error"*|*"curl: (35)"*|*"curl: (60)"*)
             printf 'TLS\n'
@@ -332,8 +401,8 @@ git_explain_remote_failure() {
             code="${GS_CODE_AUTH_PERMISSION}"
             ;;
         REMOTE_NOT_FOUND)
-            reason="The remote repository was not found."
-            next="Confirm the HTTPS remote URL. Create the empty remote if it is missing."
+            reason="The repository was not found or is not accessible."
+            next="Confirm the HTTPS remote URL and your access. Create the empty remote if it is missing."
             code="${GS_CODE_GIT_REMOTE_NOT_FOUND}"
             ;;
         NON_FAST_FORWARD)

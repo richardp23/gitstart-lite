@@ -40,10 +40,43 @@ fatal: unable to access'
 got="$(git_classify_remote_error 1 "${msg}")"
 assert_eq "PERMISSION" "${got}" "PERMISSION: write access"
 
+msg='remote: Push not permitted
+error: failed to push some refs'
+got="$(git_classify_remote_error 1 "${msg}")"
+assert_eq "PERMISSION" "${got}" "PERMISSION: push not permitted"
+
+msg='remote: error: GH006: Protected branch update failed'
+got="$(git_classify_remote_error 1 "${msg}")"
+assert_eq "PERMISSION" "${got}" "PERMISSION: protected branch"
+
+msg='The requested URL returned error: 403'
+got="$(git_classify_remote_error 1 "${msg}")"
+assert_eq "PERMISSION" "${got}" "PERMISSION: HTTP 403"
+
 msg='remote: Repository not found.
 fatal: repository https://example.com/missing.git/ not found'
 got="$(git_classify_remote_error 128 "${msg}")"
 assert_eq "REMOTE_NOT_FOUND" "${got}" "REMOTE_NOT_FOUND"
+
+msg='fatal: Authentication failed for https://example.com/r.git/'
+got="$(git_classify_remote_error 128 "${msg}")"
+assert_eq "AUTHENTICATION" "${got}" "AUTHENTICATION: failed"
+
+msg="fatal: could not read Username for 'https://github.com': terminal prompts disabled"
+got="$(git_classify_remote_error 128 "${msg}")"
+assert_eq "AUTHENTICATION" "${got}" "AUTHENTICATION: prompts disabled"
+
+msg='Permission denied (publickey).'
+got="$(git_classify_remote_error 128 "${msg}")"
+assert_eq "AUTHENTICATION" "${got}" "AUTHENTICATION: publickey"
+
+msg='The requested URL returned error: 401'
+got="$(git_classify_remote_error 128 "${msg}")"
+assert_eq "AUTHENTICATION" "${got}" "AUTHENTICATION: HTTP 401"
+
+msg='fatal: Permission denied'
+got="$(git_classify_remote_error 128 "${msg}")"
+assert_eq "UNKNOWN" "${got}" "UNKNOWN: generic permission denied"
 
 msg='! [rejected]        main -> main (non-fast-forward)
 error: failed to push some refs'

@@ -138,6 +138,7 @@ main() {
     main_parse_args "$@"
     terminal_init
     ui_init_styles
+    lesson_session_record_start_dir
     ui_show_banner
 
     if ! main_require_git; then
