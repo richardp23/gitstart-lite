@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - name: Check out repository
@@ -27,15 +27,20 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
       - name: Build release file
+        shell: bash
         run: bash build.sh
 
       - name: Syntax check
+        shell: bash
         run: bash -n dist/gitstart.sh
 
       - name: Run automated tests
+        shell: bash
         run: bash tests/run_tests.sh
 
       - name: Run ShellCheck when available
+        if: runner.os == 'Linux'
+        shell: bash
         run: |
           if command -v shellcheck >/dev/null 2>&1; then
             shellcheck -s bash dist/gitstart.sh
