@@ -1,19 +1,19 @@
-# Implements: FR-160 through FR-184.
+# Implements: FR-160 through FR-184, FR-130, FR-164–FR-166.
 # Teach a student how to publish an existing directory as a new repository.
 
 GS_LESSON_INIT_COMMIT_MSG=""
 GS_LESSON_INIT_REMOTE_URL=""
 
+# Check and set Git author identity in the current repository.
+# Call after git init so local config applies to the selected project.
 lesson_initialize_set_identity() {
     local name
     local email
     local scope
 
-    # Quiet preflight. Speak only when author data is missing.
-    git_state_inspect
-
     name=""
     email=""
+    # Effective identity in this repository (local, then global).
     if git_cmd_config_get "user.name"; then
         name="${GS_GIT_LAST_STDOUT}"
     fi
@@ -22,6 +22,7 @@ lesson_initialize_set_identity() {
     fi
 
     if [ -n "${name}" ] && [ -n "${email}" ]; then
+        ui_muted "Git author: ${name} <${email}>"
         return 0
     fi
 
@@ -56,35 +57,9 @@ lesson_initialize_set_identity() {
         scope="global"
     fi
 
-    if [ "${scope}" = "local" ] && [ "${GS_STATE_IS_REPO}" != "1" ]; then
-        GS_LESSON_PENDING_NAME="${name}"
-        GS_LESSON_PENDING_EMAIL="${email}"
-        GS_LESSON_PENDING_SCOPE="local"
-        ui_muted "Author will be saved after git init."
-        return 0
-    fi
-
     git_cmd_config_set "user.name" "${name}" "${scope}" || return 1
     git_cmd_config_set "user.email" "${email}" "${scope}" || return 1
-    ui_success "Git author saved."
-    return 0
-}
-
-GS_LESSON_PENDING_NAME=""
-GS_LESSON_PENDING_EMAIL=""
-GS_LESSON_PENDING_SCOPE=""
-
-lesson_initialize_apply_pending_identity() {
-    local scope
-    if [ -n "${GS_LESSON_PENDING_NAME}" ]; then
-        scope="${GS_LESSON_PENDING_SCOPE:-local}"
-        git_cmd_config_set "user.name" "${GS_LESSON_PENDING_NAME}" "${scope}" || return 1
-        git_cmd_config_set "user.email" "${GS_LESSON_PENDING_EMAIL}" "${scope}" || return 1
-        GS_LESSON_PENDING_NAME=""
-        GS_LESSON_PENDING_EMAIL=""
-        GS_LESSON_PENDING_SCOPE=""
-        ui_success "Local Git author configuration was saved"
-    fi
+    ui_success "Git author saved (${scope})."
     return 0
 }
 
@@ -138,13 +113,7 @@ lesson_initialize_repository() {
     local list_cmd
     local commit_display
 
-    lesson_begin "Publish a directory as a new repository" 11 "${GS_LESSON_INIT}"
-
-    GS_LESSON_PENDING_NAME=""
-    GS_LESSON_PENDING_EMAIL=""
-    if ! lesson_initialize_set_identity; then
-        return 1
-    fi
+    lesson_begin "Publish a directory as a new repository" 12 "${GS_LESSON_INIT}"
 
     if ! picker_run; then
         return 1
@@ -181,8 +150,7 @@ lesson_initialize_repository() {
         return 1
     fi
 
-    git_state_inspect
-    if [ "${GS_STATE_IS_REPO}" = "1" ]; then
+    if git_state_check_is_repo; then
         lesson_stop_safe \
             "This directory is already a Git repository." \
             "A .git directory or parent repository was detected." \
@@ -191,6 +159,7 @@ lesson_initialize_repository() {
         return 1
     fi
 
+    git_state_inspect
     if git_state_is_nested "$(pwd)"; then
         ui_warning "This directory may be inside another Git repository"
         ui_info "A nested repository can confuse later Git commands."
@@ -209,8 +178,7 @@ lesson_initialize_repository() {
     then
         return 1
     fi
-    git_state_inspect
-    if [ "${GS_STATE_IS_REPO}" != "1" ]; then
+    if ! git_state_check_is_repo; then
         lesson_stop_safe \
             "Repository initialization failed." \
             "Git did not report a working tree after git init." \
@@ -219,7 +187,10 @@ lesson_initialize_repository() {
         return 1
     fi
 
-    lesson_initialize_apply_pending_identity || return 1
+    lesson_step_begin "Set Git author identity"
+    if ! lesson_initialize_set_identity; then
+        return 1
+    fi
 
     lesson_step_begin "Name the branch main"
     ui_info "A branch is a named line of work. Classroom remotes usually start with main."
@@ -282,8 +253,7 @@ lesson_initialize_repository() {
     then
         return 1
     fi
-    git_state_inspect
-    if [ "${GS_STATE_HAS_COMMIT}" != "1" ]; then
+    if ! git_state_check_has_commit; then
         lesson_stop_safe \
             "The commit was not created." \
             "HEAD does not identify a commit." \
@@ -311,8 +281,7 @@ lesson_initialize_repository() {
         ui_info "Example: https://github.com/ACCOUNT/PROJECT.git"
     done
 
-    git_state_inspect
-    if [ "${GS_STATE_HAS_ORIGIN}" = "1" ]; then
+    if git_state_check_has_remote "origin"; then
         lesson_stop_safe \
             "An origin remote already exists." \
             "Replacing a remote is not allowed in this lesson." \
@@ -327,6 +296,14 @@ lesson_initialize_repository() {
         "Save the hosting service URL under the name origin." \
         "Git stores the remote URL under the name origin."
     then
+        return 1
+    fi
+    if ! git_state_check_has_remote "origin"; then
+        lesson_stop_safe \
+            "The origin remote was not saved." \
+            "Git did not report an origin remote after the add step." \
+            "Check the remote URL. Run the lesson again." \
+            "${GS_CODE_GIT_STATE}"
         return 1
     fi
 
@@ -351,12 +328,11 @@ lesson_initialize_repository() {
         "Publish your branch to origin and remember that remote as upstream." \
         "The remote branch exists and your local branch tracks it."
     then
-        lesson_explain_offline "git push"
-        ui_info "Your local commit remains safe"
+        lesson_explain_remote_failure "git push"
         return 1
     fi
 
-    git_state_inspect
+    git_state_inspect_tracking
     lesson_verify_state
     lesson_complete
     return 0

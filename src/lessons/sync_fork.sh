@@ -112,7 +112,7 @@ lesson_sync_fork() {
         "Download new commits from the original repository." \
         "upstream remote-tracking branches are updated."
     then
-        lesson_explain_offline "git fetch upstream"
+        lesson_explain_remote_failure "git fetch upstream"
         return 1
     fi
 
@@ -158,8 +158,7 @@ lesson_sync_fork() {
         "Update your fork after a successful upstream sync." \
         "origin has the updated branch."
     then
-        lesson_explain_offline "git push"
-        ui_info "Your local fast-forward update is preserved"
+        lesson_explain_remote_failure "git push"
         return 1
     fi
 

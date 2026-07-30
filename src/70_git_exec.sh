@@ -3,6 +3,7 @@
 
 GS_GIT_LAST_STATUS=0
 GS_GIT_LAST_STDOUT=""
+GS_GIT_REMOTE_ERROR_CLASS=""
 
 # Return 0 when git is available.
 git_is_available() {
@@ -215,4 +216,149 @@ git_cmd_config_set() {
 git_cmd_check_ref_format() {
     local branch="$1"
     git_run_readonly check-ref-format --branch "${branch}"
+}
+
+# Classify a failed remote Git operation. Print one category name.
+# Categories: NETWORK TLS AUTHENTICATION PERMISSION REMOTE_NOT_FOUND
+# NON_FAST_FORWARD DIVERGED UNKNOWN
+# Uses exit status, message text, and optional relation hint. Does not guess.
+# Usage: git_classify_remote_error STATUS MESSAGE [RELATION]
+git_classify_remote_error() {
+    local status="${1:-1}"
+    local message="${2:-}"
+    local relation="${3:-}"
+    local lower
+
+    lower="$(printf '%s' "${message}" | tr '[:upper:]' '[:lower:]')"
+
+    # Strong relation evidence from prior state inspection.
+    if [ "${relation}" = "DIVERGED" ]; then
+        printf 'DIVERGED\n'
+        return 0
+    fi
+
+    case "${lower}" in
+        *"have diverged"*|*"diverged"*"merge"*|*"need to be merged"*)
+            printf 'DIVERGED\n'
+            return 0
+            ;;
+    esac
+
+    case "${lower}" in
+        *"non-fast-forward"*|*"fetch first"*|*"updates were rejected"*)
+            printf 'NON_FAST_FORWARD\n'
+            return 0
+            ;;
+    esac
+
+    case "${lower}" in
+        *"repository not found"*|*"repo not found"*)
+            printf 'REMOTE_NOT_FOUND\n'
+            return 0
+            ;;
+    esac
+
+    case "${lower}" in
+        *"write access"*|*"not allowed to push"*|*"protected branch"*|*"permission to"*"denied to push"*)
+            printf 'PERMISSION\n'
+            return 0
+            ;;
+    esac
+
+    case "${lower}" in
+        *"authentication failed"*|*"invalid credentials"*|*"could not read username"*|*"terminal prompts disabled"*|*"http basic: access denied"*|*"401 unauthorized"*|*"auth failed"*)
+            printf 'AUTHENTICATION\n'
+            return 0
+            ;;
+    esac
+
+    case "${lower}" in
+        *"permission denied (publickey)"*|*"permission denied"*|*"403 forbidden"*|*"access denied"*)
+            printf 'AUTHENTICATION\n'
+            return 0
+            ;;
+    esac
+
+    case "${lower}" in
+        *"ssl certificate"*|*"tls"*|*"schannel"*|*"revocation"*|*"certificate verify failed"*|*"ssl error"*|*"curl: (35)"*|*"curl: (60)"*)
+            printf 'TLS\n'
+            return 0
+            ;;
+    esac
+
+    case "${lower}" in
+        *"could not resolve host"*|*"name or service not known"*|*"nodename nor servname"*|*"temporary failure in name resolution"*|*"network is unreachable"*|*"no route to host"*|*"connection timed out"*|*"could not connect"*|*"connection refused"*|*"failed to connect"*)
+            printf 'NETWORK\n'
+            return 0
+            ;;
+    esac
+
+    # Weak evidence: stay UNKNOWN (FR-287).
+    : "${status}"
+    printf 'UNKNOWN\n'
+    return 0
+}
+
+# Explain a classified remote failure. Uses GS_GIT_LAST_* and optional relation.
+# Usage: git_explain_remote_failure OPERATION [RELATION]
+git_explain_remote_failure() {
+    local operation="$1"
+    local relation="${2:-${GS_STATE_RELATION:-}}"
+    local reason
+    local next
+    local code
+
+    GS_GIT_REMOTE_ERROR_CLASS="$(git_classify_remote_error "${GS_GIT_LAST_STATUS:-1}" "${GS_GIT_LAST_STDOUT:-}" "${relation}")"
+
+    case "${GS_GIT_REMOTE_ERROR_CLASS}" in
+        NETWORK)
+            reason="The remote host was not reachable."
+            next="Check your network connection. Run this lesson again."
+            code="${GS_CODE_NET_OFFLINE}"
+            ;;
+        TLS)
+            reason="A TLS or certificate check failed while contacting the remote."
+            next="Check the system clock and certificate store. See troubleshooting docs. Run this lesson again."
+            code="${GS_CODE_NET_TLS}"
+            ;;
+        AUTHENTICATION)
+            reason="The remote rejected authentication."
+            next="Sign in with your Git credential helper. GitStart does not request a password or token."
+            code="${GS_CODE_AUTH_REQUIRED}"
+            ;;
+        PERMISSION)
+            reason="Your account does not have permission for this remote action."
+            next="Confirm the repository URL and your access rights. Ask an instructor if needed."
+            code="${GS_CODE_AUTH_PERMISSION}"
+            ;;
+        REMOTE_NOT_FOUND)
+            reason="The remote repository was not found."
+            next="Confirm the HTTPS remote URL. Create the empty remote if it is missing."
+            code="${GS_CODE_GIT_REMOTE_NOT_FOUND}"
+            ;;
+        NON_FAST_FORWARD)
+            reason="The remote has commits that your branch does not have."
+            next="Use the update lesson or diagnose. Do not force-push."
+            code="${GS_CODE_GIT_NON_FF}"
+            ;;
+        DIVERGED)
+            reason="The local and remote branches have diverged."
+            next="Use diagnosis. Ask an instructor before you merge. Do not force-push."
+            code="${GS_CODE_SAFE_DIVERGED}"
+            ;;
+        *)
+            GS_GIT_REMOTE_ERROR_CLASS="UNKNOWN"
+            reason="The remote command failed for an unclear reason."
+            next="Read the Git message above. Use Diagnose, then ask an instructor if needed."
+            code="${GS_CODE_GIT_STATE}"
+            ;;
+    esac
+
+    ui_fail_detail \
+        "Remote step failed: ${operation}" \
+        "${operation}" \
+        "${reason}" \
+        "${next}" \
+        "${code}"
+    ui_muted "Class: ${GS_GIT_REMOTE_ERROR_CLASS}"
 }

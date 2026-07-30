@@ -16,7 +16,25 @@ boot_is_windows_shell() {
     return 1
 }
 
+# Print a bootstrap warning to stderr (safe when stdout is captured).
+boot_warn() {
+    printf '%s\n' "$*" >&2
+}
+
+# Resolve a command to an absolute path when possible. Print path or name.
+boot_resolve_bin() {
+    local name="$1"
+    local resolved
+    if resolved="$(command -v "${name}" 2>/dev/null)" && [ -n "${resolved}" ]; then
+        printf '%s\n' "${resolved}"
+        return 0
+    fi
+    printf '%s\n' "${name}"
+    return 1
+}
+
 # Try one curl binary. Return 0 on success.
+# Extra curl flags may follow dest.
 boot_try_curl_bin() {
     local bin="$1"
     local url="$2"
@@ -32,32 +50,48 @@ boot_try_curl_bin() {
     "${bin}" "$@" -fsSL "${url}" -o "${dest}" 2>/dev/null
 }
 
-# Download a URL to a file or stdout. Try several transports on Windows.
+# Download a URL to a file or stdout.
+# Windows order: normal curl, Windows curl.exe, other transports,
+# then --ssl-no-revoke only as a TLS fallback.
 boot_download() {
     local url="$1"
     local dest="$2"
     local win_curl="/c/Windows/System32/curl.exe"
+    local curl_bin
+    local curl_path
+    local win_path
 
     if boot_is_windows_shell; then
-        if boot_try_curl_bin curl "${url}" "${dest}" --ssl-no-revoke; then
-            return 0
-        fi
+        curl_bin="$(boot_resolve_bin curl)"
+        curl_path="${curl_bin}"
+        win_path="${win_curl}"
+
+        # 1) Normal curl (PATH).
         if boot_try_curl_bin curl "${url}" "${dest}"; then
             return 0
         fi
-        if boot_try_curl_bin "${win_curl}" "${url}" "${dest}" --ssl-no-revoke; then
-            return 0
+
+        # 2) Windows curl.exe when it is a different executable.
+        if [ -x "${win_curl}" ] || command -v "${win_curl}" >/dev/null 2>&1; then
+            if [ "${curl_path}" != "${win_path}" ]; then
+                if boot_try_curl_bin "${win_curl}" "${url}" "${dest}"; then
+                    return 0
+                fi
+            fi
         fi
-        if boot_try_curl_bin "${win_curl}" "${url}" "${dest}"; then
-            return 0
-        fi
+
+        # 3) Other normal transports.
         if command -v wget >/dev/null 2>&1; then
             if [ "${dest}" = "-" ]; then
-                wget -q -O - "${url}" 2>/dev/null
-                return $?
+                if wget -q -O - "${url}" 2>/dev/null; then
+                    return 0
+                fi
+            else
+                if wget -q -O "${dest}" "${url}" 2>/dev/null; then
+                    return 0
+                fi
+                rm -f "${dest}" 2>/dev/null || true
             fi
-            wget -q -O "${dest}" "${url}" 2>/dev/null
-            return $?
         fi
         if command -v powershell.exe >/dev/null 2>&1 && [ "${dest}" != "-" ]; then
             powershell.exe -NoProfile -Command \
@@ -67,6 +101,24 @@ boot_download() {
                 return 0
             fi
             rm -f "${dest}" 2>/dev/null || true
+        fi
+
+        # 4) curl with --ssl-no-revoke only after normal TLS attempts fail.
+        if boot_try_curl_bin curl "${url}" "${dest}" --ssl-no-revoke; then
+            boot_warn "[WARNING] Used curl --ssl-no-revoke after normal TLS failed."
+            boot_warn "Certificate revocation was not checked for this download."
+            boot_warn "Code: GS-BOOT-002"
+            return 0
+        fi
+        if [ -x "${win_curl}" ] || command -v "${win_curl}" >/dev/null 2>&1; then
+            if [ "${curl_path}" != "${win_path}" ]; then
+                if boot_try_curl_bin "${win_curl}" "${url}" "${dest}" --ssl-no-revoke; then
+                    boot_warn "[WARNING] Used Windows curl.exe --ssl-no-revoke after normal TLS failed."
+                    boot_warn "Certificate revocation was not checked for this download."
+                    boot_warn "Code: GS-BOOT-002"
+                    return 0
+                fi
+            fi
         fi
         return 1
     fi
@@ -103,7 +155,10 @@ boot_print_download_help() {
     printf "   powershell -Command \"Invoke-WebRequest -Uri '%s' -OutFile gitstart.sh.sha256\"\n" "${sum_url}" >&2
     printf '   Then in Git Bash: sha256sum -c gitstart.sh.sha256 && bash gitstart.sh\n' >&2
     printf '\n' >&2
-    printf 'See %s/docs/offline.html\n' "${BASE_URL}" >&2
+    printf '3) Outer curl with --ssl-no-revoke (Windows, when the one-line launch fails before bootstrap)\n' >&2
+    printf '   bash -c "$(curl -fsSL --ssl-no-revoke %s/run)"\n' "${BASE_URL}" >&2
+    printf '\n' >&2
+    printf 'See %s/docs/troubleshooting.html\n' "${BASE_URL}" >&2
 }
 
 read_stable_version() {
@@ -133,6 +188,17 @@ confirm_without_checksum() {
     esac
 }
 
+# Remove only the temporary directory created by this bootstrap.
+# Safe when called more than once.
+cleanup() {
+    local dir="${GS_TMP_DIR:-}"
+    GS_TMP_DIR=""
+    if [ -n "${dir}" ] && [ -d "${dir}" ]; then
+        rm -rf -- "${dir}"
+    fi
+}
+trap cleanup EXIT INT TERM HUP
+
 VERSION="$(read_stable_version)"
 VERSION="${VERSION#v}"
 APP_URL="${BASE_URL}/releases/v${VERSION}/gitstart.sh"
@@ -147,13 +213,7 @@ fi
 
 GS_TMP_APP="${GS_TMP_DIR}/gitstart.sh"
 GS_TMP_SUM="${GS_TMP_DIR}/gitstart.sh.sha256"
-
-cleanup() {
-    if [ -n "${GS_TMP_DIR:-}" ] && [ -d "${GS_TMP_DIR}" ]; then
-        rm -rf "${GS_TMP_DIR}"
-    fi
-}
-trap cleanup EXIT INT TERM HUP
+GS_BOOT_STATUS=0
 
 printf '[INFO] GitStart Lite bootstrap\n'
 printf '[INFO] Version: v%s\n' "${VERSION}"
@@ -205,4 +265,8 @@ else
     fi
 fi
 
-exec bash "${GS_TMP_APP}" "$@"
+# Run the application in this shell so the EXIT trap can remove GS_TMP_DIR.
+# Do not use exec: exec replaces the shell and skips normal EXIT cleanup.
+bash "${GS_TMP_APP}" "$@"
+GS_BOOT_STATUS=$?
+exit "${GS_BOOT_STATUS}"

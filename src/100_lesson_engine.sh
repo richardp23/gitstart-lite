@@ -278,6 +278,12 @@ lesson_explain_offline() {
     ui_muted "Code: ${GS_CODE_NET_OFFLINE}"
 }
 
+# Explain a failed remote Git step using the conservative classifier (FR-287).
+lesson_explain_remote_failure() {
+    local step_name="$1"
+    git_explain_remote_failure "${step_name}" "${GS_STATE_RELATION:-}"
+}
+
 # Build a student-friendly cd path. Prefer ~/ when the folder is under HOME.
 lesson_cd_display_path() {
     local dir="$1"

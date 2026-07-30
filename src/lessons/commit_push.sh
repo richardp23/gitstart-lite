@@ -142,8 +142,7 @@ lesson_commit_push() {
         "Update remote tracking data so you know if the remote has new commits." \
         "Remote branch information is current."
     then
-        lesson_explain_offline "git fetch"
-        ui_info "Your local commit is safe"
+        lesson_explain_remote_failure "git fetch"
         return 1
     fi
 
@@ -175,7 +174,7 @@ lesson_commit_push() {
                     "Publish your commits and remember origin as the upstream for this branch." \
                     "The remote branch tracks your local branch."
                 then
-                    lesson_explain_offline "git push"
+                    lesson_explain_remote_failure "git push"
                     return 1
                 fi
                 git_state_inspect
@@ -205,9 +204,7 @@ lesson_commit_push() {
         "Send local commits that are ahead of the upstream branch." \
         "The remote branch includes your commits."
     then
-        lesson_explain_offline "git push"
-        ui_info "Your local commit is safe"
-        ui_muted "If Git asked for a password or token, use your credential helper. Code: ${GS_CODE_AUTH_REQUIRED}"
+        lesson_explain_remote_failure "git push"
         return 1
     fi
 

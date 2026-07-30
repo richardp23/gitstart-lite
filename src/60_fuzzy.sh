@@ -1,5 +1,8 @@
 # Local fuzzy matcher for visible directory labels.
 # Implements: FR-068 through FR-070.
+#
+# Lowercase once per call. Use Bash substring expansion in character loops.
+# Do not call cut/tr/sed inside per-character loops.
 
 # Score a candidate label against a query. Higher is better. Print score.
 # Score bands: exact 10000, prefix 8000+, substring 5000+, ordered chars 1000+.
@@ -16,7 +19,9 @@ fuzzy_score() {
     local gaps
     local first_pos
     local last_pos
+    local slice
 
+    # One lowercase pass each (external tr once, not per character).
     q_lower="$(printf '%s' "${query}" | tr '[:upper:]' '[:lower:]')"
     c_lower="$(printf '%s' "${candidate}" | tr '[:upper:]' '[:lower:]')"
     q_len="${#q_lower}"
@@ -41,11 +46,12 @@ fuzzy_score() {
 
     case "${c_lower}" in
         *"${q_lower}"*)
-            # Prefer earlier substring match.
+            # Prefer earlier substring match. Bash slice avoids cut.
             first_pos=0
             i=0
             while [ "${i}" -le "$((c_len - q_len))" ]; do
-                if [ "$(printf '%s' "${c_lower}" | cut -c $((i + 1))-$((i + q_len)))" = "${q_lower}" ]; then
+                slice="${c_lower:${i}:${q_len}}"
+                if [ "${slice}" = "${q_lower}" ]; then
                     first_pos="${i}"
                     break
                 fi
@@ -63,9 +69,9 @@ fuzzy_score() {
     first_pos=-1
     last_pos=-1
     while [ "${i}" -lt "${q_len}" ] && [ "${j}" -lt "${c_len}" ]; do
-        ch="$(printf '%s' "${q_lower}" | cut -c $((i + 1)))"
+        ch="${q_lower:${i}:1}"
         while [ "${j}" -lt "${c_len}" ]; do
-            if [ "$(printf '%s' "${c_lower}" | cut -c $((j + 1)))" = "${ch}" ]; then
+            if [ "${c_lower:${j}:1}" = "${ch}" ]; then
                 if [ "${first_pos}" -lt 0 ]; then
                     first_pos="${j}"
                 fi

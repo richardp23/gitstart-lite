@@ -205,3 +205,78 @@ git_state_is_nested() {
             ;;
     esac
 }
+
+# Targeted checks for lesson steps. Prefer these over a full inspect when enough.
+
+# Return 0 when the current directory is inside a Git working tree.
+git_state_check_is_repo() {
+    if ! git_capture rev-parse --is-inside-work-tree; then
+        return 1
+    fi
+    if [ "${GS_GIT_LAST_STDOUT}" = "true" ]; then
+        return 0
+    fi
+    return 1
+}
+
+# Return 0 when HEAD identifies a commit.
+git_state_check_has_commit() {
+    git_capture rev-parse --verify HEAD
+}
+
+# Return 0 when a named remote exists.
+git_state_check_has_remote() {
+    local name="$1"
+    git_capture remote get-url "${name}"
+}
+
+# Refresh upstream tracking and ahead/behind only. Keep other GS_STATE_* values.
+git_state_inspect_tracking() {
+    local counts
+    local ahead
+    local behind
+
+    GS_STATE_UPSTREAM=""
+    GS_STATE_AHEAD=0
+    GS_STATE_BEHIND=0
+    GS_STATE_RELATION="UNKNOWN"
+
+    if ! git_state_check_is_repo; then
+        GS_STATE_IS_REPO=0
+        return 1
+    fi
+    GS_STATE_IS_REPO=1
+
+    if git_capture branch --show-current; then
+        GS_STATE_BRANCH="${GS_GIT_LAST_STDOUT}"
+    elif git_capture rev-parse --abbrev-ref HEAD; then
+        if [ "${GS_GIT_LAST_STDOUT}" != "HEAD" ]; then
+            GS_STATE_BRANCH="${GS_GIT_LAST_STDOUT}"
+        fi
+    fi
+
+    if git_capture rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'; then
+        GS_STATE_UPSTREAM="${GS_GIT_LAST_STDOUT}"
+    else
+        GS_STATE_RELATION="UNTRACKED"
+        return 0
+    fi
+
+    if git_capture rev-list --left-right --count 'HEAD...@{upstream}'; then
+        counts="${GS_GIT_LAST_STDOUT}"
+        ahead="$(printf '%s' "${counts}" | awk '{print $1}')"
+        behind="$(printf '%s' "${counts}" | awk '{print $2}')"
+        GS_STATE_AHEAD="${ahead:-0}"
+        GS_STATE_BEHIND="${behind:-0}"
+        if [ "${GS_STATE_AHEAD}" -gt 0 ] 2>/dev/null && [ "${GS_STATE_BEHIND}" -gt 0 ] 2>/dev/null; then
+            GS_STATE_RELATION="DIVERGED"
+        elif [ "${GS_STATE_AHEAD}" -gt 0 ] 2>/dev/null; then
+            GS_STATE_RELATION="AHEAD"
+        elif [ "${GS_STATE_BEHIND}" -gt 0 ] 2>/dev/null; then
+            GS_STATE_RELATION="BEHIND"
+        else
+            GS_STATE_RELATION="EQUAL"
+        fi
+    fi
+    return 0
+}

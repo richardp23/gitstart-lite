@@ -71,7 +71,7 @@ lesson_update_clone() {
         "Download remote commits so you can compare your branch with the remote." \
         "Remote tracking branches are updated."
     then
-        lesson_explain_offline "git fetch"
+        lesson_explain_remote_failure "git fetch"
         return 1
     fi
 
@@ -122,11 +122,7 @@ lesson_update_clone() {
         "Update your local branch only when the remote is a straight continuation of your history." \
         "Your local branch matches the upstream branch."
     then
-        lesson_stop_safe \
-            "The fast-forward update did not complete." \
-            "Git rejected a non-fast-forward update or the network failed." \
-            "Your local files were not discarded. Use diagnosis." \
-            "${GS_CODE_SAFE_STOP}"
+        lesson_explain_remote_failure "git pull --ff-only"
         return 1
     fi
 
